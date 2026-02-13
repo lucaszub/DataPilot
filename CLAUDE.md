@@ -1,4 +1,4 @@
-# DataPilot — Contexte Projet pour Claude Code
+je # DataPilot — Contexte Projet pour Claude Code
 
 ## Qu'est-ce que DataPilot ?
 Plateforme SaaS de Business Intelligence avec IA conversationnelle,
