@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.routers import auth
 
 app = FastAPI(
     title="DataPilot API",
@@ -17,14 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# TODO: Include routers in Phase 1 implementation
-# from app.routers import auth, workspaces, data_sources, dashboards, ai
-# app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
-# app.include_router(workspaces.router, prefix="/api/v1/workspaces", tags=["workspaces"])
-# app.include_router(data_sources.router, prefix="/api/v1/data-sources", tags=["data-sources"])
-# app.include_router(dashboards.router, prefix="/api/v1/dashboards", tags=["dashboards"])
-# app.include_router(ai.router, prefix="/api/v1/ai", tags=["ai"])
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 
 
 @app.get("/health")
