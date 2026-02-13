@@ -45,3 +45,8 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
     return user
+
+
+def get_tenant_id(current_user: User = Depends(get_current_user)) -> uuid.UUID:
+    """Extract tenant_id from the authenticated user."""
+    return current_user.tenant_id
