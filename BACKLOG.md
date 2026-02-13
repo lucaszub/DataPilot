@@ -9,10 +9,10 @@
 | Metric | Value | Target |
 |--------|-------|--------|
 | Phase 1 Tasks | 23 | 100% |
-| Completed | 0 | 23 |
+| Completed | 1 | 23 |
 | In Progress | 0 | — |
 | Blocked | 0 | 0 |
-| Completion Rate | 0% | 100% |
+| Completion Rate | 4% | 100% |
 | Timeline | Week 1 | Week 16 |
 
 ---
@@ -37,7 +37,7 @@ Each task has:
 #### Backend Infrastructure
 | ID | Task | Status | Effort | Priority | Owner | Depends | Notes |
 |---|------|--------|--------|----------|-------|---------|-------|
-| P1-BACK-01 | Setup PostgreSQL migrations base | `todo` | XS | 1 | — | — | Alembic init, create users/workspaces/data_sources tables |
+| P1-BACK-01 | Setup PostgreSQL migrations base | `completed` ✅ 2026-02-13 | XS | 1 | Claude | — | PR #2 — 001_initial_schema.py : users, workspaces, data_sources, dashboards, widgets, semantic_layers |
 | P1-BACK-02 | Implement auth service (JWT) | `todo` | S | 1 | — | P1-BACK-01 | register, login, refresh, password hashing with bcrypt |
 | P1-BACK-03 | Implement auth routes (/login, /register, /refresh) | `todo` | S | 1 | — | P1-BACK-02 | Multi-tenant by tenant_id, request/response schemas |
 | P1-BACK-04 | Add auth tests | `todo` | S | 2 | — | P1-BACK-03 | pytest fixtures, AsyncClient tests |
