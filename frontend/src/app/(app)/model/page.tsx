@@ -20,11 +20,22 @@ import {
 import '@xyflow/react/dist/style.css';
 import { Save, Database, Loader2, Search, X, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 import { TableNode, type TableNodeData } from '@/components/features/TableNode';
+import { JoinEdge, type JoinEdgeData } from '@/components/features/JoinEdge';
+import { JoinConfigPanel, type JoinConfig } from '@/components/features/JoinConfigPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api, type DataSourceListItem, type DataSourceDetail, type SemanticLayerDefinitions, type SemanticLayerDetail } from '@/lib/api';
 
 const nodeTypes = { tableNode: TableNode };
+const edgeTypes = { joinEdge: JoinEdge };
+
+interface PendingConnection {
+  connection: Connection;
+  sourceNode: Node<TableNodeData['data']>;
+  targetNode: Node<TableNodeData['data']>;
+  suggestedSourceColumn?: string;
+  suggestedTargetColumn?: string;
+}
 
 function ModelCanvas() {
   const reactFlowInstance = useReactFlow();
@@ -39,6 +50,8 @@ function ModelCanvas() {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [currentLayerId, setCurrentLayerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [pendingConnection, setPendingConnection] = useState<PendingConnection | null>(null);
+  const [editingEdge, setEditingEdge] = useState<{ edge: Edge; sourceNode: Node<TableNodeData['data']>; targetNode: Node<TableNodeData['data']> } | null>(null);
 
   // Fetch or create default workspace, then load existing semantic layer
   useEffect(() => {
@@ -80,7 +93,12 @@ function ModelCanvas() {
               target: e.target_node,
               sourceHandle: `${e.source_column}-source`,
               targetHandle: `${e.target_column}-target`,
-              type: 'smoothstep' as const,
+              type: 'joinEdge' as const,
+              data: {
+                joinType: e.join_type,
+                sourceColumn: e.source_column,
+                targetColumn: e.target_column,
+              } as JoinEdgeData,
             }));
             setNodes(restoredNodes);
             setEdges(restoredEdges);
@@ -110,9 +128,150 @@ function ModelCanvas() {
     loadDataSources();
   }, []);
 
+  // Auto-detect matching columns between two nodes
+  const detectMatchingColumns = useCallback((
+    sourceNode: Node<TableNodeData['data']>,
+    targetNode: Node<TableNodeData['data']>,
+    sourceHandle?: string | null,
+    targetHandle?: string | null
+  ): { sourceColumn?: string; targetColumn?: string } => {
+    // If handles specify columns, use those
+    if (sourceHandle && targetHandle) {
+      const sourceCol = sourceHandle.replace('-source', '');
+      const targetCol = targetHandle.replace('-target', '');
+      return { sourceColumn: sourceCol, targetColumn: targetCol };
+    }
+
+    // Otherwise, look for matching column names
+    const sourceColumns = sourceNode.data.columns.map(c => c.name);
+    const targetColumns = targetNode.data.columns.map(c => c.name);
+
+    // Find exact match
+    const match = sourceColumns.find(sc => targetColumns.includes(sc));
+    if (match) {
+      return { sourceColumn: match, targetColumn: match };
+    }
+
+    // Find common ID patterns
+    const idPatterns = ['id', '_id', 'ID'];
+    for (const pattern of idPatterns) {
+      const sourceId = sourceColumns.find(c => c.toLowerCase().includes(pattern.toLowerCase()));
+      const targetId = targetColumns.find(c => c.toLowerCase().includes(pattern.toLowerCase()));
+      if (sourceId && targetId) {
+        return { sourceColumn: sourceId, targetColumn: targetId };
+      }
+    }
+
+    return {};
+  }, []);
+
   const onConnect: OnConnect = useCallback((params: Connection) => {
-    setEdges((eds) => addEdge({ ...params, type: 'smoothstep' }, eds));
-  }, [setEdges]);
+    // Find source and target nodes
+    const sourceNode = nodes.find(n => n.id === params.source);
+    const targetNode = nodes.find(n => n.id === params.target);
+
+    if (!sourceNode || !targetNode) return;
+
+    // Detect matching columns
+    const { sourceColumn, targetColumn } = detectMatchingColumns(
+      sourceNode as Node<TableNodeData['data']>,
+      targetNode as Node<TableNodeData['data']>,
+      params.sourceHandle,
+      params.targetHandle
+    );
+
+    // Set pending connection to show config panel
+    setPendingConnection({
+      connection: params,
+      sourceNode: sourceNode as Node<TableNodeData['data']>,
+      targetNode: targetNode as Node<TableNodeData['data']>,
+      suggestedSourceColumn: sourceColumn,
+      suggestedTargetColumn: targetColumn,
+    });
+  }, [nodes, detectMatchingColumns]);
+
+  // Confirm join configuration
+  const handleJoinConfirm = useCallback((config: Omit<JoinConfig, 'sourceNode' | 'targetNode'>) => {
+    if (!pendingConnection) return;
+
+    const { connection } = pendingConnection;
+    const newEdge: Edge = {
+      id: `${connection.source}-${connection.target}-${Date.now()}`,
+      source: connection.source!,
+      target: connection.target!,
+      sourceHandle: `${config.sourceColumn}-source`,
+      targetHandle: `${config.targetColumn}-target`,
+      type: 'joinEdge',
+      data: {
+        joinType: config.joinType,
+        sourceColumn: config.sourceColumn,
+        targetColumn: config.targetColumn,
+        onEdit: undefined, // Will be set below
+      } as JoinEdgeData,
+    };
+
+    setEdges((eds) => [...eds, newEdge]);
+    setPendingConnection(null);
+  }, [pendingConnection, setEdges]);
+
+  const handleJoinCancel = useCallback(() => {
+    setPendingConnection(null);
+  }, []);
+
+  // Edit existing edge
+  const handleEditEdge = useCallback((edgeId: string) => {
+    const edge = edges.find(e => e.id === edgeId);
+    if (!edge) return;
+
+    const sourceNode = nodes.find(n => n.id === edge.source);
+    const targetNode = nodes.find(n => n.id === edge.target);
+
+    if (!sourceNode || !targetNode) return;
+
+    setEditingEdge({
+      edge,
+      sourceNode: sourceNode as Node<TableNodeData['data']>,
+      targetNode: targetNode as Node<TableNodeData['data']>,
+    });
+  }, [edges, nodes]);
+
+  const handleEditConfirm = useCallback((config: Omit<JoinConfig, 'sourceNode' | 'targetNode'>) => {
+    if (!editingEdge) return;
+
+    setEdges((eds) =>
+      eds.map((e) =>
+        e.id === editingEdge.edge.id
+          ? {
+              ...e,
+              sourceHandle: `${config.sourceColumn}-source`,
+              targetHandle: `${config.targetColumn}-target`,
+              data: {
+                ...(e.data || {}),
+                joinType: config.joinType,
+                sourceColumn: config.sourceColumn,
+                targetColumn: config.targetColumn,
+              } as JoinEdgeData,
+            }
+          : e
+      )
+    );
+    setEditingEdge(null);
+  }, [editingEdge, setEdges]);
+
+  const handleEditCancel = useCallback(() => {
+    setEditingEdge(null);
+  }, []);
+
+  // Attach edit handlers to edges
+  const edgesWithHandlers = useMemo(() => {
+    return edges.map((edge) => ({
+      ...edge,
+      data: {
+        ...(edge.data || {}),
+        onEdit: () => handleEditEdge(edge.id),
+      } as JoinEdgeData,
+    }));
+  }, [edges, handleEditEdge]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -200,14 +359,17 @@ function ModelCanvas() {
           position: node.position,
           columns: node.data.columns,
         })),
-        edges: edges.map(edge => ({
-          id: edge.id,
-          source_node: edge.source,
-          source_column: edge.sourceHandle?.replace('-source', '') || '',
-          target_node: edge.target,
-          target_column: edge.targetHandle?.replace('-target', '') || '',
-          join_type: 'LEFT' as const,
-        })),
+        edges: edges.map(edge => {
+          const edgeData = edge.data as JoinEdgeData | undefined;
+          return {
+            id: edge.id,
+            source_node: edge.source,
+            source_column: edgeData?.sourceColumn || edge.sourceHandle?.replace('-source', '') || '',
+            target_node: edge.target,
+            target_column: edgeData?.targetColumn || edge.targetHandle?.replace('-target', '') || '',
+            join_type: edgeData?.joinType || 'LEFT',
+          };
+        }),
       };
 
       if (currentLayerId) {
@@ -405,11 +567,12 @@ function ModelCanvas() {
 
           <ReactFlow
             nodes={nodes}
-            edges={edges}
+            edges={edgesWithHandlers}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             fitView
             className="bg-gray-50"
           >
@@ -420,6 +583,38 @@ function ModelCanvas() {
             />
             <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#e5e7eb" />
           </ReactFlow>
+
+          {/* Join configuration panel for new connections */}
+          {pendingConnection && (
+            <JoinConfigPanel
+              sourceNodeLabel={pendingConnection.sourceNode.data.label}
+              targetNodeLabel={pendingConnection.targetNode.data.label}
+              sourceColumns={pendingConnection.sourceNode.data.columns.map(c => c.name)}
+              targetColumns={pendingConnection.targetNode.data.columns.map(c => c.name)}
+              suggestedSourceColumn={pendingConnection.suggestedSourceColumn}
+              suggestedTargetColumn={pendingConnection.suggestedTargetColumn}
+              onConfirm={handleJoinConfirm}
+              onCancel={handleJoinCancel}
+            />
+          )}
+
+          {/* Join configuration panel for editing existing edges */}
+          {editingEdge && (() => {
+            const edgeData = editingEdge.edge.data as JoinEdgeData | undefined;
+            return (
+              <JoinConfigPanel
+                sourceNodeLabel={editingEdge.sourceNode.data.label}
+                targetNodeLabel={editingEdge.targetNode.data.label}
+                sourceColumns={editingEdge.sourceNode.data.columns.map(c => c.name)}
+                targetColumns={editingEdge.targetNode.data.columns.map(c => c.name)}
+                suggestedSourceColumn={edgeData?.sourceColumn}
+                suggestedTargetColumn={edgeData?.targetColumn}
+                initialJoinType={edgeData?.joinType}
+                onConfirm={handleEditConfirm}
+                onCancel={handleEditCancel}
+              />
+            );
+          })()}
         </div>
       </div>
     </div>

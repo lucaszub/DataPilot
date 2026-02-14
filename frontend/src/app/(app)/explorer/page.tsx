@@ -95,24 +95,181 @@ export default function ExplorerPage() {
     return allMetrics;
   }, [layerDetail]);
 
-  // --- SQL Generation ---
+  // --- SQL Generation with JOIN support ---
   const generatedSql = useMemo(() => {
     if (selectedFields.length === 0) return '';
 
     const tables = [...new Set(selectedFields.map(f => f.tableName))];
     const hasAggregation = selectedFields.some(f => f.aggregation !== 'none');
 
-    const selectParts = selectedFields.map(f => {
-      if (f.aggregation !== 'none') {
-        return `${f.aggregation}(${f.name}) AS ${f.name}_${f.aggregation.toLowerCase()}`;
+    // If only one table, no JOINs needed
+    if (tables.length === 1) {
+      const selectParts = selectedFields.map(f => {
+        const qualifiedName = `${f.tableName}.${f.name}`;
+        if (f.aggregation !== 'none') {
+          return `${f.aggregation}(${qualifiedName}) AS ${f.name}_${f.aggregation.toLowerCase()}`;
+        }
+        return qualifiedName;
+      });
+
+      let sql = `SELECT ${selectParts.join(', ')}\nFROM ${tables[0]}`;
+
+      if (hasAggregation) {
+        const groupByCols = selectedFields
+          .filter(f => f.aggregation === 'none')
+          .map(f => `${f.tableName}.${f.name}`);
+        if (groupByCols.length > 0) {
+          sql += `\nGROUP BY ${groupByCols.join(', ')}`;
+        }
       }
-      return f.name;
+
+      sql += '\nLIMIT 100';
+      return sql;
+    }
+
+    // Multi-table query — need JOINs
+    if (!layerDetail?.definitions_json?.edges || !layerDetail?.definitions_json?.nodes) {
+      return '-- Error: Semantic layer edges not available';
+    }
+
+    // Extract definitions for type safety
+    const definitions = layerDetail.definitions_json;
+    const { nodes, edges } = definitions;
+
+    // Build node ID → table name map
+    const nodeIdToTable = new Map<string, string>();
+    for (const node of nodes) {
+      nodeIdToTable.set(node.id, node.data_source_name);
+    }
+
+    // Build adjacency list from edges (bidirectional for pathfinding)
+    type EdgeWithDetails = { targetNode: string; edge: typeof edges[number] };
+    const graph = new Map<string, EdgeWithDetails[]>();
+
+    for (const edge of edges) {
+      // Forward edge
+      if (!graph.has(edge.source_node)) {
+        graph.set(edge.source_node, []);
+      }
+      graph.get(edge.source_node)!.push({ targetNode: edge.target_node, edge });
+
+      // Reverse edge (for pathfinding)
+      if (!graph.has(edge.target_node)) {
+        graph.set(edge.target_node, []);
+      }
+      graph.get(edge.target_node)!.push({
+        targetNode: edge.source_node,
+        edge: {
+          ...edge,
+          // Swap source/target for reverse traversal
+          source_node: edge.target_node,
+          source_column: edge.target_column,
+          target_node: edge.source_node,
+          target_column: edge.source_column,
+        }
+      });
+    }
+
+    // Find node IDs for each table
+    const tableToNodeId = new Map<string, string>();
+    for (const [nodeId, tableName] of nodeIdToTable.entries()) {
+      tableToNodeId.set(tableName, nodeId);
+    }
+
+    // Find paths between tables using BFS
+    function findPath(startTable: string, endTable: string): typeof edges | null {
+      const startNode = tableToNodeId.get(startTable);
+      const endNode = tableToNodeId.get(endTable);
+      if (!startNode || !endNode) return null;
+
+      const visited = new Set<string>();
+      const queue: Array<{ node: string; path: typeof edges }> = [
+        { node: startNode, path: [] }
+      ];
+
+      while (queue.length > 0) {
+        const { node, path } = queue.shift()!;
+
+        if (node === endNode) {
+          return path;
+        }
+
+        if (visited.has(node)) continue;
+        visited.add(node);
+
+        const neighbors = graph.get(node) || [];
+        for (const { targetNode, edge } of neighbors) {
+          if (!visited.has(targetNode)) {
+            queue.push({ node: targetNode, path: [...path, edge] });
+          }
+        }
+      }
+
+      return null;
+    }
+
+    // Determine primary table (most selected fields)
+    const tableCounts = new Map<string, number>();
+    for (const field of selectedFields) {
+      tableCounts.set(field.tableName, (tableCounts.get(field.tableName) || 0) + 1);
+    }
+    const primaryTable = tables.reduce((a, b) =>
+      (tableCounts.get(a) || 0) > (tableCounts.get(b) || 0) ? a : b
+    );
+
+    // Collect all edges needed to join all tables
+    const joinEdges: typeof edges = [];
+    const joinedTables = new Set<string>([primaryTable]);
+
+    for (const table of tables) {
+      if (table === primaryTable) continue;
+
+      const path = findPath(primaryTable, table);
+      if (!path) {
+        return `-- Error: No join path found between ${primaryTable} and ${table}`;
+      }
+
+      // Add edges from the path that connect new tables
+      for (const edge of path) {
+        const sourceTable = nodeIdToTable.get(edge.source_node);
+        const targetTable = nodeIdToTable.get(edge.target_node);
+
+        if (!sourceTable || !targetTable) continue;
+
+        // Only add edge if it connects a new table
+        if (!joinedTables.has(targetTable)) {
+          joinEdges.push(edge);
+          joinedTables.add(targetTable);
+        }
+      }
+    }
+
+    // Build SELECT clause with qualified column names
+    const selectParts = selectedFields.map(f => {
+      const qualifiedName = `${f.tableName}.${f.name}`;
+      if (f.aggregation !== 'none') {
+        return `${f.aggregation}(${qualifiedName}) AS ${f.name}_${f.aggregation.toLowerCase()}`;
+      }
+      return qualifiedName;
     });
 
-    let sql = `SELECT ${selectParts.join(', ')}\nFROM ${tables[0]}`;
+    let sql = `SELECT ${selectParts.join(', ')}\nFROM ${primaryTable}`;
 
+    // Build JOIN clauses
+    for (const edge of joinEdges) {
+      const sourceTable = nodeIdToTable.get(edge.source_node);
+      const targetTable = nodeIdToTable.get(edge.target_node);
+
+      if (!sourceTable || !targetTable) continue;
+
+      sql += `\n${edge.join_type} JOIN ${targetTable} ON ${sourceTable}.${edge.source_column} = ${targetTable}.${edge.target_column}`;
+    }
+
+    // Build GROUP BY clause
     if (hasAggregation) {
-      const groupByCols = selectedFields.filter(f => f.aggregation === 'none').map(f => f.name);
+      const groupByCols = selectedFields
+        .filter(f => f.aggregation === 'none')
+        .map(f => `${f.tableName}.${f.name}`);
       if (groupByCols.length > 0) {
         sql += `\nGROUP BY ${groupByCols.join(', ')}`;
       }
@@ -120,7 +277,7 @@ export default function ExplorerPage() {
 
     sql += '\nLIMIT 100';
     return sql;
-  }, [selectedFields]);
+  }, [selectedFields, layerDetail]);
 
   // --- Handlers ---
   const addField = useCallback((columnName: string, tableName: string, colType: string) => {
@@ -551,6 +708,13 @@ export default function ExplorerPage() {
             {execError && (
               <Alert variant="destructive" className="mb-4">
                 {execError}
+              </Alert>
+            )}
+
+            {/* SQL generation warning (e.g., missing JOIN paths) */}
+            {!execError && generatedSql.startsWith('-- Error:') && (
+              <Alert variant="destructive" className="mb-4">
+                {generatedSql.replace(/^-- Error:\s*/, '')}
               </Alert>
             )}
 

@@ -85,7 +85,7 @@ export interface SemanticLayerEdge {
   source_column: string;
   target_node: string;
   target_column: string;
-  join_type: 'LEFT' | 'INNER';
+  join_type: 'LEFT' | 'INNER' | 'RIGHT' | 'FULL';
 }
 
 export interface SemanticLayerDefinitions {
