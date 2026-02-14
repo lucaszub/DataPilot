@@ -9,6 +9,8 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import concurrent.futures
+
 import duckdb
 from sqlalchemy.orm import Session
 
@@ -17,7 +19,8 @@ from app.models.data_source import DataSource
 
 # SQL statements that are NOT allowed (write operations)
 _FORBIDDEN_SQL_PATTERN = re.compile(
-    r"\b(DROP|DELETE|INSERT|UPDATE|CREATE|ALTER|TRUNCATE|GRANT|REVOKE|EXEC|EXECUTE|CALL|MERGE|UPSERT)\b",
+    r"\b(DROP|DELETE|INSERT|UPDATE|CREATE|ALTER|TRUNCATE|GRANT|REVOKE|EXEC|EXECUTE|CALL|MERGE|UPSERT"
+    r"|COPY|SET|ATTACH|DETACH|LOAD|INSTALL)\b",
     re.IGNORECASE,
 )
 
@@ -47,6 +50,10 @@ def _sanitize_sql(sql_text: str) -> str:
     stripped = sql_text.strip().rstrip(";").strip()
     if not stripped:
         raise ValueError("SQL query cannot be empty")
+
+    # Reject embedded semicolons (multi-statement injection)
+    if ";" in stripped:
+        raise ValueError("Multiple SQL statements are not allowed")
 
     # Check for forbidden statements
     match = _FORBIDDEN_SQL_PATTERN.search(stripped)
@@ -151,12 +158,13 @@ class SemanticQueryBuilder:
                     f"Parquet file not found for data source '{source_name}'"
                 )
 
-            # Sanitize view name: only alphanumeric and underscores
-            safe_name = re.sub(r"[^a-zA-Z0-9_]", "_", source_name)
+            # Sanitize view name: only alphanumeric and underscores, max 128 chars
+            safe_name = re.sub(r"[^a-zA-Z0-9_]", "_", source_name)[:128]
             parquet_str = str(parquet_path).replace("'", "''")
 
+            # Quote view name with double quotes to prevent keyword collisions
             self._conn.execute(
-                f"CREATE VIEW {safe_name} AS SELECT * FROM read_parquet('{parquet_str}')"
+                f'CREATE VIEW "{safe_name}" AS SELECT * FROM read_parquet(\'{parquet_str}\')'
             )
             views_created.append(safe_name)
 
@@ -197,8 +205,9 @@ class SemanticQueryBuilder:
         sanitized = _ensure_limit(sanitized, effective_limit)
 
         start = time.monotonic()
-        try:
-            result = self._conn.execute(sanitized)
+
+        def _run_query() -> tuple[list[dict], list[dict]]:
+            result = self._conn.execute(sanitized)  # type: ignore[union-attr]
             columns = [
                 {"name": desc[0], "type": str(desc[1])}
                 for desc in result.description
@@ -208,6 +217,12 @@ class SemanticQueryBuilder:
                 {col["name"]: _json_safe(val) for col, val in zip(columns, row)}
                 for row in raw_rows
             ]
+            return columns, rows
+
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(_run_query)
+                columns, rows = future.result(timeout=timeout_seconds)
 
             elapsed_ms = round((time.monotonic() - start) * 1000, 2)
 
@@ -217,6 +232,13 @@ class SemanticQueryBuilder:
                 "row_count": len(rows),
                 "execution_time_ms": elapsed_ms,
             }
+        except concurrent.futures.TimeoutError:
+            # Cancel the connection to abort the running query
+            if self._conn:
+                self._conn.interrupt()
+            raise TimeoutError(
+                f"Query exceeded timeout of {timeout_seconds} seconds"
+            )
         except duckdb.Error as e:
             raise ValueError(f"Query execution error: {str(e)}")
 
@@ -226,8 +248,8 @@ class SemanticQueryBuilder:
             self._conn.close()
             self._conn = None
 
-    def __enter__(self):
+    def __enter__(self) -> "SemanticQueryBuilder":
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *args: object) -> None:
         self.close()

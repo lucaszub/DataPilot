@@ -69,6 +69,11 @@ def execute_query(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+    except TimeoutError as e:
+        raise HTTPException(
+            status_code=status.HTTP_408_REQUEST_TIMEOUT,
+            detail=str(e),
+        )
     except RuntimeError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
