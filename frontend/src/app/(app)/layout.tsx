@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Database,
   GitMerge,
-  MessageSquare,
+  Code,
   LayoutDashboard,
   Settings,
   LogOut,
@@ -31,7 +31,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const navItems = [
   { label: "Sources", icon: Database, href: "/sources" },
   { label: "Modele", icon: GitMerge, href: "/model" },
-  { label: "Explorer", icon: MessageSquare, href: "/chat" },
+  { label: "Explorer", icon: Code, href: "/explorer" },
   { label: "Tableaux de bord", icon: LayoutDashboard, href: "/dashboard" },
   { label: "Parametres", icon: Settings, href: "/settings" },
 ] as const;
