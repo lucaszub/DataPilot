@@ -19,6 +19,8 @@ import {
   CalendarDays,
   Hash,
   Type as TypeIcon,
+  Filter,
+  ArrowUpDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
@@ -36,6 +38,30 @@ import { cn } from "@/lib/utils";
 
 type AggregationType = 'none' | 'SUM' | 'COUNT' | 'AVG' | 'MIN' | 'MAX' | 'MEDIAN' | 'COUNT_DISTINCT';
 type DateGranularity = 'raw' | 'year' | 'quarter' | 'month' | 'week' | 'day';
+
+type FilterOperator =
+  // Text
+  | 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'starts_with' | 'ends_with' | 'is_null' | 'is_not_null'
+  // Numeric
+  | 'gt' | 'gte' | 'lt' | 'lte' | 'between'
+  // Date
+  | 'date_equals' | 'date_before' | 'date_after' | 'date_between' | 'date_last_n_days' | 'date_last_n_months' | 'date_this_month' | 'date_this_year' | 'date_last_year';
+
+interface QueryFilter {
+  id: string;
+  column: string;
+  tableName: string;
+  type: string; // column data type
+  operator: FilterOperator;
+  value: string;
+  value2?: string; // for "between" operators
+}
+
+interface SortRule {
+  column: string;
+  tableName: string;
+  direction: 'ASC' | 'DESC';
+}
 
 interface SelectedField {
   name: string;
@@ -80,6 +106,13 @@ export default function ExplorerPage() {
   // Date granularity dropdown state
   const [openDateDropdownIndex, setOpenDateDropdownIndex] = useState<number | null>(null);
   const dateDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Filters and sorting state
+  const [filters, setFilters] = useState<QueryFilter[]>([]);
+  const [sortRules, setSortRules] = useState<SortRule[]>([]);
+  const [queryLimit, setQueryLimit] = useState<number>(100);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showSorts, setShowSorts] = useState(false);
 
   // --- Data fetching ---
   const { data: workspaces, isLoading: wsLoading } = useSWR<WorkspaceResponse[]>(
@@ -135,6 +168,81 @@ export default function ExplorerPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // --- Helper: Generate WHERE clause from filters ---
+  const generateWhereClause = useCallback((filterList: QueryFilter[]): string => {
+    if (filterList.length === 0) return '';
+
+    const conditions = filterList.map(filter => {
+      const qualifiedColumn = `${filter.tableName}.${filter.column}`;
+      const escapedValue = filter.value.replace(/'/g, "''"); // SQL escape single quotes
+      const escapedValue2 = filter.value2 ? filter.value2.replace(/'/g, "''") : '';
+
+      switch (filter.operator) {
+        // Text operators
+        case 'equals':
+          return `${qualifiedColumn} = '${escapedValue}'`;
+        case 'not_equals':
+          return `${qualifiedColumn} <> '${escapedValue}'`;
+        case 'contains':
+          return `${qualifiedColumn} LIKE '%${escapedValue}%'`;
+        case 'not_contains':
+          return `${qualifiedColumn} NOT LIKE '%${escapedValue}%'`;
+        case 'starts_with':
+          return `${qualifiedColumn} LIKE '${escapedValue}%'`;
+        case 'ends_with':
+          return `${qualifiedColumn} LIKE '%${escapedValue}'`;
+        case 'is_null':
+          return `${qualifiedColumn} IS NULL`;
+        case 'is_not_null':
+          return `${qualifiedColumn} IS NOT NULL`;
+
+        // Numeric operators
+        case 'gt':
+          return `${qualifiedColumn} > ${escapedValue}`;
+        case 'gte':
+          return `${qualifiedColumn} >= ${escapedValue}`;
+        case 'lt':
+          return `${qualifiedColumn} < ${escapedValue}`;
+        case 'lte':
+          return `${qualifiedColumn} <= ${escapedValue}`;
+        case 'between':
+          return `${qualifiedColumn} BETWEEN ${escapedValue} AND ${escapedValue2}`;
+
+        // Date operators
+        case 'date_equals':
+          return `${qualifiedColumn} = '${escapedValue}'`;
+        case 'date_before':
+          return `${qualifiedColumn} < '${escapedValue}'`;
+        case 'date_after':
+          return `${qualifiedColumn} > '${escapedValue}'`;
+        case 'date_between':
+          return `${qualifiedColumn} BETWEEN '${escapedValue}' AND '${escapedValue2}'`;
+        case 'date_last_n_days':
+          return `${qualifiedColumn} >= CURRENT_DATE - INTERVAL '${escapedValue} days'`;
+        case 'date_last_n_months':
+          return `${qualifiedColumn} >= CURRENT_DATE - INTERVAL '${escapedValue} months'`;
+        case 'date_this_month':
+          return `${qualifiedColumn} >= DATE_TRUNC('month', CURRENT_DATE)`;
+        case 'date_this_year':
+          return `${qualifiedColumn} >= DATE_TRUNC('year', CURRENT_DATE)`;
+        case 'date_last_year':
+          return `${qualifiedColumn} >= DATE_TRUNC('year', CURRENT_DATE - INTERVAL '1 year') AND ${qualifiedColumn} < DATE_TRUNC('year', CURRENT_DATE)`;
+
+        default:
+          return '';
+      }
+    }).filter(Boolean);
+
+    return conditions.length > 0 ? `\nWHERE ${conditions.join(' AND ')}` : '';
+  }, []);
+
+  // --- Helper: Generate ORDER BY clause ---
+  const generateOrderByClause = useCallback((sortList: SortRule[]): string => {
+    if (sortList.length === 0) return '';
+    const sortParts = sortList.map(sort => `${sort.tableName}.${sort.column} ${sort.direction}`);
+    return `\nORDER BY ${sortParts.join(', ')}`;
+  }, []);
+
   // --- SQL Generation with JOIN support ---
   const generatedSql = useMemo(() => {
     if (selectedFields.length === 0) return '';
@@ -174,6 +282,9 @@ export default function ExplorerPage() {
 
       let sql = `SELECT ${selectParts.join(', ')}\nFROM ${tables[0]}`;
 
+      // Add WHERE clause
+      sql += generateWhereClause(filters);
+
       if (hasAggregation) {
         const groupByCols = selectedFields
           .filter(f => f.aggregation === 'none')
@@ -189,7 +300,10 @@ export default function ExplorerPage() {
         }
       }
 
-      sql += '\nLIMIT 100';
+      // Add ORDER BY clause
+      sql += generateOrderByClause(sortRules);
+
+      sql += `\nLIMIT ${queryLimit}`;
       return sql;
     }
 
@@ -351,6 +465,9 @@ export default function ExplorerPage() {
       sql += `\n${edge.join_type} JOIN ${targetTable} ON ${sourceTable}.${edge.source_column} = ${targetTable}.${edge.target_column}`;
     }
 
+    // Add WHERE clause
+    sql += generateWhereClause(filters);
+
     // Build GROUP BY clause
     if (hasAggregation) {
       const groupByCols = selectedFields
@@ -367,9 +484,12 @@ export default function ExplorerPage() {
       }
     }
 
-    sql += '\nLIMIT 100';
+    // Add ORDER BY clause
+    sql += generateOrderByClause(sortRules);
+
+    sql += `\nLIMIT ${queryLimit}`;
     return sql;
-  }, [selectedFields, layerDetail]);
+  }, [selectedFields, layerDetail, filters, sortRules, queryLimit, generateWhereClause, generateOrderByClause]);
 
   // --- Handlers ---
   const addField = useCallback((columnName: string, tableName: string, colType: string, colRole?: 'dimension' | 'measure' | 'ignore') => {
@@ -429,6 +549,89 @@ export default function ExplorerPage() {
     setOpenDateDropdownIndex(prev => prev === index ? null : index);
   }, []);
 
+  // --- Filter handlers ---
+  const addFilter = useCallback(() => {
+    // Find the first available column from expanded models
+    if (!layerDetail?.definitions_json?.nodes) return;
+
+    const firstNode = layerDetail.definitions_json.nodes[0];
+    const firstColumn = firstNode.columns.find(col => col.role !== 'ignore');
+
+    if (!firstColumn) return;
+
+    const newFilter: QueryFilter = {
+      id: `filter-${Date.now()}-${Math.random()}`,
+      column: firstColumn.name,
+      tableName: firstNode.data_source_name,
+      type: firstColumn.type,
+      operator: isDateType(firstColumn.type) ? 'date_equals' : isNumericType(firstColumn.type) ? 'equals' : 'equals',
+      value: '',
+    };
+
+    setFilters(prev => [...prev, newFilter]);
+    setShowFilters(true);
+  }, [layerDetail]);
+
+  const updateFilter = useCallback((filterId: string, updates: Partial<QueryFilter>) => {
+    setFilters(prev => prev.map(f => {
+      if (f.id !== filterId) return f;
+
+      // If column changed, reset operator and values
+      if (updates.column !== undefined || updates.tableName !== undefined) {
+        const newColumn = updates.column ?? f.column;
+        const newTableName = updates.tableName ?? f.tableName;
+
+        // Find the column type
+        const node = layerDetail?.definitions_json?.nodes.find(n => n.data_source_name === newTableName);
+        const col = node?.columns.find(c => c.name === newColumn);
+        const newType = col?.type ?? f.type;
+
+        return {
+          ...f,
+          ...updates,
+          type: newType,
+          operator: isDateType(newType) ? 'date_equals' : isNumericType(newType) ? 'equals' : 'equals',
+          value: '',
+          value2: undefined,
+        };
+      }
+
+      return { ...f, ...updates };
+    }));
+  }, [layerDetail]);
+
+  const removeFilter = useCallback((filterId: string) => {
+    setFilters(prev => prev.filter(f => f.id !== filterId));
+  }, []);
+
+  // --- Sort handlers ---
+  const addSort = useCallback(() => {
+    // Find the first available column from expanded models
+    if (!layerDetail?.definitions_json?.nodes) return;
+
+    const firstNode = layerDetail.definitions_json.nodes[0];
+    const firstColumn = firstNode.columns.find(col => col.role !== 'ignore');
+
+    if (!firstColumn) return;
+
+    const newSort: SortRule = {
+      column: firstColumn.name,
+      tableName: firstNode.data_source_name,
+      direction: 'ASC',
+    };
+
+    setSortRules(prev => [...prev, newSort]);
+    setShowSorts(true);
+  }, [layerDetail]);
+
+  const updateSort = useCallback((index: number, updates: Partial<SortRule>) => {
+    setSortRules(prev => prev.map((s, i) => i === index ? { ...s, ...updates } : s));
+  }, []);
+
+  const removeSort = useCallback((index: number) => {
+    setSortRules(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
   // Sync generatedSql to customSql when in visual mode
   useEffect(() => {
     if (sqlMode === 'visual') {
@@ -439,7 +642,7 @@ export default function ExplorerPage() {
   // Get the current SQL to execute
   const currentSql = sqlMode === 'sql' ? customSql : generatedSql;
 
-  // Auto-execute when fields change in visual mode (debounced)
+  // Auto-execute when fields/filters/sorts/limit change in visual mode (debounced)
   useEffect(() => {
     if (sqlMode === 'sql') return; // Don't auto-execute in SQL mode
     if (selectedFields.length === 0 || !selectedWorkspaceId) {
@@ -466,7 +669,7 @@ export default function ExplorerPage() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [selectedFields, selectedWorkspaceId, generatedSql, sqlMode]);
+  }, [selectedFields, filters, sortRules, queryLimit, selectedWorkspaceId, generatedSql, sqlMode]);
 
   const handleExecute = useCallback(async () => {
     if (!selectedWorkspaceId) return;
@@ -1060,6 +1263,262 @@ export default function ExplorerPage() {
                 })}
               </div>
 
+              {/* Filters Section */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 transition-colors"
+                  >
+                    <Filter className="h-3.5 w-3.5" />
+                    Filtres
+                    {filters.length > 0 && (
+                      <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-teal-100 text-teal-700 text-[10px] font-semibold">
+                        {filters.length}
+                      </span>
+                    )}
+                    {showFilters ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  </button>
+                  {showFilters && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={addFilter}
+                      className="h-6 px-2 text-xs"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Ajouter un filtre
+                    </Button>
+                  )}
+                </div>
+
+                {showFilters && filters.length > 0 && (
+                  <div className="space-y-2 pl-5">
+                    {filters.map((filter) => {
+                      // Get available columns from all nodes
+                      const allColumns = layerDetail?.definitions_json?.nodes.flatMap(node =>
+                        node.columns
+                          .filter(col => col.role !== 'ignore')
+                          .map(col => ({
+                            name: col.name,
+                            tableName: node.data_source_name,
+                            type: col.type,
+                            label: `${node.data_source_name}.${col.name}`,
+                          }))
+                      ) ?? [];
+
+                      // Get operators for this filter's type
+                      const getOperatorsForType = (type: string) => {
+                        if (isDateType(type)) {
+                          return [
+                            { value: 'date_equals' as const, label: 'Égal' },
+                            { value: 'date_before' as const, label: 'Avant' },
+                            { value: 'date_after' as const, label: 'Après' },
+                            { value: 'date_between' as const, label: 'Entre' },
+                            { value: 'date_last_n_days' as const, label: 'Derniers N jours' },
+                            { value: 'date_last_n_months' as const, label: 'Derniers N mois' },
+                            { value: 'date_this_month' as const, label: 'Ce mois-ci' },
+                            { value: 'date_this_year' as const, label: 'Cette année' },
+                            { value: 'date_last_year' as const, label: 'Année dernière' },
+                          ];
+                        } else if (isNumericType(type)) {
+                          return [
+                            { value: 'equals' as const, label: 'Égal' },
+                            { value: 'not_equals' as const, label: 'Différent' },
+                            { value: 'gt' as const, label: 'Supérieur' },
+                            { value: 'gte' as const, label: 'Supérieur ou égal' },
+                            { value: 'lt' as const, label: 'Inférieur' },
+                            { value: 'lte' as const, label: 'Inférieur ou égal' },
+                            { value: 'between' as const, label: 'Entre' },
+                            { value: 'is_null' as const, label: 'Est vide' },
+                            { value: 'is_not_null' as const, label: "N'est pas vide" },
+                          ];
+                        } else {
+                          return [
+                            { value: 'equals' as const, label: 'Égal' },
+                            { value: 'not_equals' as const, label: 'Différent' },
+                            { value: 'contains' as const, label: 'Contient' },
+                            { value: 'not_contains' as const, label: 'Ne contient pas' },
+                            { value: 'starts_with' as const, label: 'Commence par' },
+                            { value: 'ends_with' as const, label: 'Termine par' },
+                            { value: 'is_null' as const, label: 'Est vide' },
+                            { value: 'is_not_null' as const, label: "N'est pas vide" },
+                          ];
+                        }
+                      };
+
+                      const operators = getOperatorsForType(filter.type);
+                      const needsValue = !['is_null', 'is_not_null', 'date_this_month', 'date_this_year', 'date_last_year'].includes(filter.operator);
+                      const needsValue2 = ['between', 'date_between'].includes(filter.operator);
+
+                      return (
+                        <div key={filter.id} className="flex items-center gap-2 text-xs">
+                          {/* Column selector */}
+                          <select
+                            value={`${filter.tableName}.${filter.column}`}
+                            onChange={(e) => {
+                              const [tableName, ...columnParts] = e.target.value.split('.');
+                              const column = columnParts.join('.');
+                              updateFilter(filter.id, { tableName, column });
+                            }}
+                            className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500"
+                          >
+                            {allColumns.map((col) => (
+                              <option key={col.label} value={col.label}>
+                                {col.label}
+                              </option>
+                            ))}
+                          </select>
+
+                          {/* Operator selector */}
+                          <select
+                            value={filter.operator}
+                            onChange={(e) => updateFilter(filter.id, { operator: e.target.value as FilterOperator })}
+                            className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500"
+                          >
+                            {operators.map((op) => (
+                              <option key={op.value} value={op.value}>
+                                {op.label}
+                              </option>
+                            ))}
+                          </select>
+
+                          {/* Value input */}
+                          {needsValue && (
+                            <input
+                              type={
+                                isDateType(filter.type) && !['date_last_n_days', 'date_last_n_months'].includes(filter.operator)
+                                  ? 'date'
+                                  : isNumericType(filter.type) || ['date_last_n_days', 'date_last_n_months'].includes(filter.operator)
+                                  ? 'number'
+                                  : 'text'
+                              }
+                              value={filter.value}
+                              onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
+                              placeholder="Valeur"
+                              className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500 w-32"
+                            />
+                          )}
+
+                          {/* Second value input for BETWEEN */}
+                          {needsValue2 && (
+                            <input
+                              type={isDateType(filter.type) ? 'date' : isNumericType(filter.type) ? 'number' : 'text'}
+                              value={filter.value2 ?? ''}
+                              onChange={(e) => updateFilter(filter.id, { value2: e.target.value })}
+                              placeholder="Valeur 2"
+                              className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500 w-32"
+                            />
+                          )}
+
+                          {/* Remove button */}
+                          <button
+                            type="button"
+                            onClick={() => removeFilter(filter.id)}
+                            className="text-gray-400 hover:text-red-500 transition-colors"
+                            aria-label="Supprimer le filtre"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Sorts Section */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowSorts(!showSorts)}
+                    className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 transition-colors"
+                  >
+                    <ArrowUpDown className="h-3.5 w-3.5" />
+                    Tri
+                    {sortRules.length > 0 && (
+                      <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-teal-100 text-teal-700 text-[10px] font-semibold">
+                        {sortRules.length}
+                      </span>
+                    )}
+                    {showSorts ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  </button>
+                  {showSorts && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={addSort}
+                      className="h-6 px-2 text-xs"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Ajouter un tri
+                    </Button>
+                  )}
+                </div>
+
+                {showSorts && sortRules.length > 0 && (
+                  <div className="space-y-2 pl-5">
+                    {sortRules.map((sort, index) => {
+                      // Get available columns from all nodes
+                      const allColumns = layerDetail?.definitions_json?.nodes.flatMap(node =>
+                        node.columns
+                          .filter(col => col.role !== 'ignore')
+                          .map(col => ({
+                            name: col.name,
+                            tableName: node.data_source_name,
+                            label: `${node.data_source_name}.${col.name}`,
+                          }))
+                      ) ?? [];
+
+                      return (
+                        <div key={index} className="flex items-center gap-2 text-xs">
+                          {/* Column selector */}
+                          <select
+                            value={`${sort.tableName}.${sort.column}`}
+                            onChange={(e) => {
+                              const [tableName, ...columnParts] = e.target.value.split('.');
+                              const column = columnParts.join('.');
+                              updateSort(index, { tableName, column });
+                            }}
+                            className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500"
+                          >
+                            {allColumns.map((col) => (
+                              <option key={col.label} value={col.label}>
+                                {col.label}
+                              </option>
+                            ))}
+                          </select>
+
+                          {/* Direction toggle */}
+                          <select
+                            value={sort.direction}
+                            onChange={(e) => updateSort(index, { direction: e.target.value as 'ASC' | 'DESC' })}
+                            className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500"
+                          >
+                            <option value="ASC">Croissant</option>
+                            <option value="DESC">Décroissant</option>
+                          </select>
+
+                          {/* Remove button */}
+                          <button
+                            type="button"
+                            onClick={() => removeSort(index)}
+                            className="text-gray-400 hover:text-red-500 transition-colors"
+                            aria-label="Supprimer le tri"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               {/* SQL toggle button */}
               <div className="flex items-center gap-2">
                 <button
@@ -1152,6 +1611,21 @@ export default function ExplorerPage() {
                     ? `${Math.round(result.execution_time_ms)} ms`
                     : `${(result.execution_time_ms / 1000).toFixed(2)} s`}
                 </span>
+                <div className="ml-auto flex items-center gap-2">
+                  <label htmlFor="query-limit" className="text-xs text-gray-600">
+                    Limite:
+                  </label>
+                  <input
+                    id="query-limit"
+                    type="number"
+                    min="10"
+                    max="10000"
+                    step="10"
+                    value={queryLimit}
+                    onChange={(e) => setQueryLimit(Math.max(10, Math.min(10000, parseInt(e.target.value) || 100)))}
+                    className="w-20 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  />
+                </div>
               </div>
             )}
 
