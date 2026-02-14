@@ -110,6 +110,50 @@ export interface SemanticLayerListItem {
   created_at: string;
 }
 
+// --- Query Types ---
+
+export interface ColumnInfo {
+  name: string;
+  type: string;
+}
+
+export interface QueryExecuteRequest {
+  sql_text: string;
+  workspace_id: string;
+  limit?: number;
+}
+
+export interface QueryExecuteResponse {
+  columns: ColumnInfo[];
+  rows: Record<string, unknown>[];
+  row_count: number;
+  execution_time_ms: number;
+}
+
+export interface SavedQueryResponse {
+  id: string;
+  tenant_id: string;
+  workspace_id: string;
+  name: string;
+  sql_text: string;
+  chart_type: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface SavedQueryCreate {
+  name: string;
+  sql_text: string;
+  workspace_id: string;
+  chart_type?: string | null;
+}
+
+export interface SavedQueryUpdate {
+  name?: string;
+  sql_text?: string;
+  chart_type?: string | null;
+}
+
 // --- Concurrent refresh guard ---
 
 let isRefreshing = false;
@@ -398,11 +442,51 @@ const semanticLayersApi = {
   },
 };
 
+// --- Queries API ---
+
+const queriesApi = {
+  execute(data: QueryExecuteRequest): Promise<QueryExecuteResponse> {
+    return request<QueryExecuteResponse>('/api/v1/queries/execute', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  listSaved(workspaceId: string, skip = 0, limit = 100): Promise<SavedQueryResponse[]> {
+    return request<SavedQueryResponse[]>(
+      `/api/v1/queries/saved?workspace_id=${workspaceId}&skip=${skip}&limit=${limit}`
+    );
+  },
+
+  getSaved(id: string): Promise<SavedQueryResponse> {
+    return request<SavedQueryResponse>(`/api/v1/queries/saved/${id}`);
+  },
+
+  createSaved(data: SavedQueryCreate): Promise<SavedQueryResponse> {
+    return request<SavedQueryResponse>('/api/v1/queries/saved', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateSaved(id: string, data: SavedQueryUpdate): Promise<SavedQueryResponse> {
+    return request<SavedQueryResponse>(`/api/v1/queries/saved/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteSaved(id: string): Promise<void> {
+    return request<void>(`/api/v1/queries/saved/${id}`, { method: 'DELETE' });
+  },
+};
+
 export const api = {
   auth: authApi,
   workspaces: workspacesApi,
   dataSources: dataSourcesApi,
   semanticLayers: semanticLayersApi,
+  queries: queriesApi,
 };
 
 // Keep backward-compatible export for any existing usage
