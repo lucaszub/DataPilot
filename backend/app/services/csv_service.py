@@ -156,6 +156,91 @@ def upload_csv(
     return data_source
 
 
+def get_csv_preview(
+    data_source: DataSource,
+    page: int,
+    page_size: int,
+) -> dict:
+    """Return a paginated preview of a CSV data source via DuckDB reading the parquet file.
+
+    Args:
+        data_source: The DataSource ORM instance (must be of type 'csv').
+        page: 1-based page number.
+        page_size: Number of rows per page (1–1000).
+
+    Returns:
+        A dict with keys: columns, rows, total_rows, page, page_size, total_pages.
+
+    Raises:
+        HTTPException 422: Parquet file is missing.
+        HTTPException 500: Unexpected DuckDB error.
+    """
+    if not data_source.connection_config_encrypted:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Data source has no associated file",
+        )
+    config = json.loads(data_source.connection_config_encrypted)
+    storage_path = config.get("storage_path")
+    if not storage_path:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Data source storage path is missing",
+        )
+    parquet_path = Path(storage_path) / "processed.parquet"
+    if not parquet_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Parquet file not found — data source may be corrupted",
+        )
+
+    conn = duckdb.connect()
+    try:
+        parquet_str = str(parquet_path).replace("'", "''")
+
+        # Total row count
+        total_rows: int = conn.execute(
+            f"SELECT COUNT(*) FROM read_parquet('{parquet_str}')"
+        ).fetchone()[0]
+
+        total_pages = max(1, -(-total_rows // page_size))  # ceiling division
+
+        offset = (page - 1) * page_size
+        rel = conn.execute(
+            f"SELECT * FROM read_parquet('{parquet_str}') LIMIT {page_size} OFFSET {offset}"
+        )
+        col_names = [desc[0] for desc in rel.description]
+        raw_rows = rel.fetchall()
+        rows = [dict(zip(col_names, row)) for row in raw_rows]
+
+        # Build column schema list from parquet metadata
+        describe_rel = conn.execute(
+            f"DESCRIBE SELECT * FROM read_parquet('{parquet_str}')"
+        )
+        columns = [
+            {"name": r[0], "type": r[1]}
+            for r in describe_rel.fetchall()
+        ]
+
+        return {
+            "columns": columns,
+            "rows": rows,
+            "total_rows": total_rows,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+        }
+    except HTTPException:
+        raise
+    except duckdb.Error as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to read parquet file: {str(e)}",
+        )
+    finally:
+        conn.close()
+
+
 def delete_csv_files(data_source: DataSource) -> None:
     """Remove uploaded CSV/parquet files from disk."""
     if data_source.connection_config_encrypted:

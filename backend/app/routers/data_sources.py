@@ -2,15 +2,15 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, get_db
 from app.models.data_source import DataSource
 from app.models.user import User
-from app.schemas.data_source import DataSourceListResponse, DataSourceResponse
+from app.schemas.data_source import DataSourceListResponse, DataSourcePreviewResponse, DataSourceResponse
 from app.services.base_service import BaseTenantService
-from app.services.csv_service import delete_csv_files, upload_csv
+from app.services.csv_service import delete_csv_files, get_csv_preview, upload_csv
 
 router = APIRouter()
 
@@ -53,6 +53,20 @@ def list_data_sources(
             created_at=ds.created_at,
         ))
     return result
+
+
+@router.get("/{data_source_id}/preview", response_model=DataSourcePreviewResponse)
+def preview_data_source(
+    data_source_id: uuid.UUID,
+    page: int = Query(default=1, ge=1, description="Page number (1-based)"),
+    page_size: int = Query(default=50, ge=1, le=1000, description="Rows per page (max 1000)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return a paginated preview of the CSV data source."""
+    service = BaseTenantService(DataSource, db, current_user.tenant_id)
+    data_source = service.get_by_id(data_source_id)
+    return get_csv_preview(data_source, page, page_size)
 
 
 @router.get("/{data_source_id}", response_model=DataSourceResponse)

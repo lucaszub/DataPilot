@@ -37,3 +37,12 @@ class DataSourceListResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class DataSourcePreviewResponse(BaseModel):
+    columns: list[ColumnSchema]
+    rows: list[dict]
+    total_rows: int
+    page: int
+    page_size: int
+    total_pages: int
