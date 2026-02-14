@@ -35,6 +35,12 @@ docker-compose exec backend alembic upgrade head
 docker-compose logs -f backend
 ```
 
+### Compte admin (dev)
+
+| Email | Mot de passe |
+|-------|-------------|
+| `admin@datapilot.fr` | `admin` |
+
 ### Access
 
 - **Frontend**: http://localhost:3000
