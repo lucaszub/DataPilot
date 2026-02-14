@@ -1,3 +1,5 @@
+import os
+
 from pydantic_settings import BaseSettings
 
 
@@ -11,7 +13,7 @@ class Settings(BaseSettings):
     claude_model: str = "claude-sonnet-4-5-20250929"
     fernet_key: str = ""
     cors_origins: list[str] = ["http://localhost:3000"]
-    upload_dir: str = "/var/datapilot/uploads"
+    upload_dir: str = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
     max_upload_size_mb: int = 100
 
     class Config:

@@ -1,0 +1,13 @@
+client_id,nom,email,ville,region,segment,date_inscription
+1,Dupont SAS,contact@dupont-sas.fr,Paris,Île-de-France,PME,2024-01-15
+2,Martin & Fils,info@martin-fils.fr,Lyon,Auvergne-Rhône-Alpes,ETI,2024-02-20
+3,Leclerc Industries,achat@leclerc-ind.fr,Marseille,Provence-Alpes-Côte d'Azur,PME,2024-03-10
+4,Bernard Group,admin@bernard-group.fr,Toulouse,Occitanie,Grand Compte,2024-03-25
+5,Petit Commerce,hello@petit-commerce.fr,Nantes,Pays de la Loire,TPE,2024-04-05
+6,Robert Tech,contact@robert-tech.fr,Bordeaux,Nouvelle-Aquitaine,PME,2024-05-12
+7,Moreau Consulting,info@moreau-consulting.fr,Lille,Hauts-de-France,ETI,2024-06-01
+8,Laurent Digital,sales@laurent-digital.fr,Strasbourg,Grand Est,PME,2024-06-18
+9,Simon Logistics,contact@simon-log.fr,Rennes,Bretagne,ETI,2024-07-22
+10,Michel Distribution,admin@michel-distrib.fr,Nice,Provence-Alpes-Côte d'Azur,Grand Compte,2024-08-03
+11,Garcia Import,info@garcia-import.fr,Montpellier,Occitanie,PME,2024-08-15
+12,Thomas Energie,contact@thomas-energie.fr,Grenoble,Auvergne-Rhône-Alpes,ETI,2024-09-01
