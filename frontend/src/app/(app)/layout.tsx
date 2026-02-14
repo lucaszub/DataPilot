@@ -21,6 +21,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -49,11 +50,11 @@ function AppSidebar() {
   }
 
   return (
-    <Sidebar className="border-r border-gray-200 bg-white">
+    <Sidebar collapsible="icon" className="border-r border-gray-200 bg-white">
       {/* Logo */}
-      <SidebarHeader className="px-4 py-4 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-600">
+      <SidebarHeader className="px-2 py-4 border-b border-gray-100">
+        <div className="flex items-center gap-2 overflow-hidden">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-600">
             <svg
               className="h-5 w-5 text-white"
               fill="none"
@@ -69,7 +70,7 @@ function AppSidebar() {
               />
             </svg>
           </div>
-          <span className="text-base font-bold text-gray-900 tracking-tight">
+          <span className="text-base font-bold text-gray-900 tracking-tight group-data-[collapsible=icon]:hidden">
             DataPilot
           </span>
         </div>
@@ -85,6 +86,7 @@ function AppSidebar() {
                 <SidebarMenuButton
                   asChild
                   isActive={isActive}
+                  tooltip={item.label}
                   className={
                     isActive
                       ? "bg-teal-50 text-teal-700 font-medium hover:bg-teal-100 hover:text-teal-700"
@@ -107,10 +109,10 @@ function AppSidebar() {
       </SidebarContent>
 
       {/* Footer: user info + logout */}
-      <SidebarFooter className="border-t border-gray-100 px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
+      <SidebarFooter className="border-t border-gray-100 px-2 py-3">
+        <div className="flex items-center justify-between gap-2 overflow-hidden">
           <p
-            className="truncate text-xs text-gray-500"
+            className="truncate text-xs text-gray-500 group-data-[collapsible=icon]:hidden"
             title={user?.email ?? ""}
           >
             {user?.email ?? ""}
@@ -126,6 +128,9 @@ function AppSidebar() {
           </Button>
         </div>
       </SidebarFooter>
+
+      {/* Desktop collapse rail */}
+      <SidebarRail />
     </Sidebar>
   );
 }
@@ -142,9 +147,9 @@ export default function AppLayout({
       <div className="flex min-h-screen w-full bg-gray-50">
         <AppSidebar />
         <div className="flex flex-1 flex-col min-w-0">
-          {/* Mobile trigger */}
-          <header className="flex h-12 items-center border-b border-gray-200 bg-white px-4 md:hidden">
-            <SidebarTrigger aria-label="Ouvrir le menu" />
+          {/* Sidebar trigger */}
+          <header className="flex h-12 items-center border-b border-gray-200 bg-white px-4">
+            <SidebarTrigger aria-label="Toggle sidebar" />
           </header>
           <main className="flex-1 overflow-auto">
             {children}

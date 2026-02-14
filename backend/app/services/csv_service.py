@@ -29,6 +29,21 @@ def _get_upload_path(tenant_id: uuid.UUID, ds_id: uuid.UUID) -> Path:
     return Path(settings.upload_dir) / str(tenant_id) / str(ds_id)
 
 
+def _detect_csv_format(csv_path: Path) -> dict[str, str]:
+    """Detect CSV delimiter and decimal separator from the file header.
+
+    If semicolons outnumber commas in the header line, the file likely uses
+    European/French format (`;` delimiter, `,` decimal separator).
+    """
+    with open(csv_path, "r", encoding="utf-8", errors="replace") as f:
+        header = f.readline()
+    if not header:
+        return {}
+    if header.count(";") > header.count(","):
+        return {"delim": ";", "decimal_separator": ","}
+    return {}
+
+
 def _validate_csv_file(file: UploadFile) -> None:
     if not file.filename:
         raise HTTPException(
@@ -76,15 +91,78 @@ def _save_uploaded_file(file: UploadFile, dest: Path) -> int:
     return size
 
 
+def _build_read_csv_sql(csv_str: str, fmt: dict[str, str]) -> str:
+    """Build a read_csv_auto() SQL expression with optional format parameters.
+
+    Only passes the delimiter, *not* decimal_separator — mixed decimal formats
+    within the same file (e.g. French amount `-383,00` next to English balance
+    `252.6`) would break DuckDB's global decimal_separator setting.
+    """
+    delim = fmt.get("delim")
+    if delim:
+        return f"read_csv_auto('{csv_str}', delim='{delim}')"
+    return f"read_csv_auto('{csv_str}')"
+
+
+def _fix_french_numbers(
+    conn: duckdb.DuckDBPyConnection,
+    table_name: str,
+) -> str:
+    """Build a SELECT that converts French-format VARCHAR numbers to DOUBLE.
+
+    Detects VARCHAR columns that contain commas (`,`) in their values and where
+    ≥80 % of non-empty values are castable to DOUBLE after replacing `,` → `.`
+    and removing spaces (thousands separator).
+
+    Returns a SQL SELECT expression ready for COPY … TO.
+    """
+    cols_info = conn.execute(f"DESCRIBE {table_name}").fetchall()
+    select_parts: list[str] = []
+
+    for col_name, col_type, *_ in cols_info:
+        safe_col = f'"{col_name}"'
+        if "VARCHAR" in col_type:
+            row = conn.execute(f"""
+                SELECT
+                    COUNT(CASE WHEN {safe_col} IS NOT NULL AND {safe_col} != '' THEN 1 END),
+                    COUNT(CASE WHEN {safe_col} LIKE '%,%' THEN 1 END),
+                    COUNT(TRY_CAST(
+                        REPLACE(REPLACE({safe_col}, ' ', ''), ',', '.')
+                        AS DOUBLE
+                    ))
+                FROM {table_name}
+            """).fetchone()
+            non_empty, has_comma, castable = row
+            if has_comma > 0 and non_empty > 0 and castable / non_empty >= 0.8:
+                select_parts.append(
+                    f"TRY_CAST(REPLACE(REPLACE({safe_col}, ' ', ''), ',', '.') AS DOUBLE) AS {safe_col}"
+                )
+                continue
+        select_parts.append(safe_col)
+
+    return ", ".join(select_parts)
+
+
 def _convert_to_parquet(csv_path: Path, parquet_path: Path) -> None:
-    """Convert CSV to Parquet using DuckDB."""
+    """Convert CSV to Parquet using DuckDB, handling French number formats."""
     conn = duckdb.connect()
     try:
         csv_str = str(csv_path).replace("'", "''")
         parquet_str = str(parquet_path).replace("'", "''")
-        conn.execute(
-            f"COPY (SELECT * FROM read_csv_auto('{csv_str}')) TO '{parquet_str}' (FORMAT PARQUET)"
-        )
+        fmt = _detect_csv_format(csv_path)
+        read_expr = _build_read_csv_sql(csv_str, fmt)
+
+        if fmt.get("decimal_separator") == ",":
+            # French CSV: load into temp table, fix numbers, then export
+            conn.execute(f"CREATE TEMP TABLE _raw AS SELECT * FROM {read_expr}")
+            select_sql = _fix_french_numbers(conn, "_raw")
+            conn.execute(
+                f"COPY (SELECT {select_sql} FROM _raw) TO '{parquet_str}' (FORMAT PARQUET)"
+            )
+        else:
+            conn.execute(
+                f"COPY (SELECT * FROM {read_expr}) TO '{parquet_str}' (FORMAT PARQUET)"
+            )
     except duckdb.Error as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -94,11 +172,12 @@ def _convert_to_parquet(csv_path: Path, parquet_path: Path) -> None:
         conn.close()
 
 
-def _infer_schema(csv_path: Path) -> dict:
-    """Infer column names, types, row count, and sample rows from CSV via DuckDB."""
+def _infer_schema(parquet_path: Path) -> dict:
+    """Infer column names, types, row count, and sample rows from the parquet file."""
     conn = duckdb.connect()
     try:
-        rel = conn.read_csv(str(csv_path))
+        parquet_str = str(parquet_path).replace("'", "''")
+        rel = conn.sql(f"SELECT * FROM read_parquet('{parquet_str}')")
         columns = []
         for name, dtype in zip(rel.columns, rel.dtypes):
             columns.append({"name": name, "type": str(dtype)})
@@ -139,7 +218,7 @@ def upload_csv(
     try:
         file_size = _save_uploaded_file(file, csv_path)
         _convert_to_parquet(csv_path, parquet_path)
-        schema_info = _infer_schema(csv_path)
+        schema_info = _infer_schema(parquet_path)
     except HTTPException:
         shutil.rmtree(upload_path, ignore_errors=True)
         raise

@@ -1,30 +1,10 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import {
-  Play,
-  Save,
-  Clock,
-  Rows3,
-  ChevronDown,
-  ChevronRight,
-  Trash2,
-  FileCode,
-  X,
-  Plus,
-  MoreHorizontal,
-  Check,
-  Code2,
-  CalendarDays,
-  Hash,
-  Type as TypeIcon,
-  Filter,
-  ArrowUpDown,
-} from "lucide-react";
+import { Play, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
-import { QueryResultTable } from "@/components/features/QueryResultTable";
 import { SqlEditor } from "@/components/features/SqlEditor";
 import { useSavedQueries } from "@/hooks/useQueries";
 import {
@@ -34,47 +14,23 @@ import {
   type SemanticLayerDetail,
   type SemanticLayerListItem,
 } from "@/lib/api";
-import { cn } from "@/lib/utils";
 
-type AggregationType = 'none' | 'SUM' | 'COUNT' | 'AVG' | 'MIN' | 'MAX' | 'MEDIAN' | 'COUNT_DISTINCT';
-type DateGranularity = 'raw' | 'year' | 'quarter' | 'month' | 'week' | 'day';
+// Import extracted components
+import { ExplorerSidebar } from "@/components/features/explorer/ExplorerSidebar";
+import { SelectedFieldsBar } from "@/components/features/explorer/SelectedFieldsBar";
+import { ResultsArea } from "@/components/features/explorer/ResultsArea";
 
-type FilterOperator =
-  // Text
-  | 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'starts_with' | 'ends_with' | 'is_null' | 'is_not_null'
-  // Numeric
-  | 'gt' | 'gte' | 'lt' | 'lte' | 'between'
-  // Date
-  | 'date_equals' | 'date_before' | 'date_after' | 'date_between' | 'date_last_n_days' | 'date_last_n_months' | 'date_this_month' | 'date_this_year' | 'date_last_year';
-
-interface QueryFilter {
-  id: string;
-  column: string;
-  tableName: string;
-  type: string; // column data type
-  operator: FilterOperator;
-  value: string;
-  value2?: string; // for "between" operators
-}
-
-interface SortRule {
-  column: string;
-  tableName: string;
-  direction: 'ASC' | 'DESC';
-}
-
-interface SelectedField {
-  name: string;
-  tableName: string;
-  type: string;
-  aggregation: AggregationType;
-  dateGranularity: DateGranularity;
-}
-
-// --- Type detection helpers ---
-const isNumericType = (type: string) => /int|float|double|decimal|numeric|number|bigint|real/i.test(type);
-const isDateType = (type: string) => /date|time|timestamp/i.test(type);
-const isTextType = (type: string) => !isNumericType(type) && !isDateType(type);
+// Import types and utils
+import type {
+  SelectedField,
+  QueryFilter,
+  SortRule,
+  ChartType,
+  AggregationType,
+  DateGranularity,
+  FilterOperator,
+} from "@/components/features/explorer/types";
+import { isNumericType, isDateType } from "@/components/features/explorer/utils";
 
 export default function ExplorerPage() {
   // --- State ---
@@ -99,13 +55,13 @@ export default function ExplorerPage() {
   const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
   const [showSavedQueries, setShowSavedQueries] = useState(true);
 
+  // Chart state
+  const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
+  const [chartType, setChartType] = useState<ChartType>('bar');
+
   // Aggregation dropdown state
   const [openDropdownIndex, setOpenDropdownIndex] = useState<number | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Date granularity dropdown state
   const [openDateDropdownIndex, setOpenDateDropdownIndex] = useState<number | null>(null);
-  const dateDropdownRef = useRef<HTMLDivElement>(null);
 
   // Filters and sorting state
   const [filters, setFilters] = useState<QueryFilter[]>([]);
@@ -154,25 +110,66 @@ export default function ExplorerPage() {
     return allMetrics;
   }, [layerDetail]);
 
+  // Auto-detect best chart type based on selected fields
+  const autoDetectedChartType = useMemo((): ChartType => {
+    if (selectedFields.length === 0) return 'table';
+
+    const numericFields = selectedFields.filter(f => isNumericType(f.type));
+    const dateFields = selectedFields.filter(f => isDateType(f.type));
+    const dimensionFields = selectedFields.filter(f => !isNumericType(f.type));
+
+    // KPI: exactly 1 numeric field, no dimensions
+    if (numericFields.length === 1 && dimensionFields.length === 0) {
+      return 'kpi';
+    }
+
+    // Line chart: date dimension + numeric measure
+    if (dateFields.length >= 1 && numericFields.length >= 1) {
+      return 'line';
+    }
+
+    // Pie chart: 1 text dimension + 1 numeric measure
+    if (dimensionFields.length === 1 && numericFields.length === 1 && !dateFields.length) {
+      return 'pie';
+    }
+
+    // Bar chart: 1+ dimension + 1+ numeric measure
+    if (dimensionFields.length >= 1 && numericFields.length >= 1) {
+      return 'bar';
+    }
+
+    // Fallback
+    return 'table';
+  }, [selectedFields]);
+
+  // Update chart type when auto-detection changes and we're in chart view
+  useEffect(() => {
+    if (viewMode === 'chart') {
+      setChartType(autoDetectedChartType);
+    }
+  }, [autoDetectedChartType, viewMode]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (openDropdownIndex !== null || openDateDropdownIndex !== null) {
         setOpenDropdownIndex(null);
-      }
-      if (dateDropdownRef.current && !dateDropdownRef.current.contains(event.target as Node)) {
         setOpenDateDropdownIndex(null);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [openDropdownIndex, openDateDropdownIndex]);
 
   // --- Helper: Generate WHERE clause from filters ---
   const generateWhereClause = useCallback((filterList: QueryFilter[]): string => {
     if (filterList.length === 0) return '';
 
     const conditions = filterList.map(filter => {
+      // Skip filters with empty values (except null-check operators)
+      const nullOps: FilterOperator[] = ['is_null', 'is_not_null', 'date_this_month', 'date_this_year', 'date_last_year'];
+      if (!nullOps.includes(filter.operator) && !filter.value.trim()) return '';
+
       const qualifiedColumn = `${filter.tableName}.${filter.column}`;
       const escapedValue = filter.value.replace(/'/g, "''"); // SQL escape single quotes
       const escapedValue2 = filter.value2 ? filter.value2.replace(/'/g, "''") : '';
@@ -525,7 +522,7 @@ export default function ExplorerPage() {
     setSelectedFields(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  const setAggregation = useCallback((index: number, aggregation: AggregationType) => {
+  const updateAggregation = useCallback((index: number, aggregation: AggregationType) => {
     setSelectedFields(prev => prev.map((f, i) => {
       if (i !== index) return f;
       return { ...f, aggregation };
@@ -533,20 +530,12 @@ export default function ExplorerPage() {
     setOpenDropdownIndex(null);
   }, []);
 
-  const toggleDropdown = useCallback((index: number) => {
-    setOpenDropdownIndex(prev => prev === index ? null : index);
-  }, []);
-
-  const setDateGranularity = useCallback((index: number, granularity: DateGranularity) => {
+  const updateDateGranularity = useCallback((index: number, granularity: DateGranularity) => {
     setSelectedFields(prev => prev.map((f, i) => {
       if (i !== index) return f;
       return { ...f, dateGranularity: granularity };
     }));
     setOpenDateDropdownIndex(null);
-  }, []);
-
-  const toggleDateDropdown = useCallback((index: number) => {
-    setOpenDateDropdownIndex(prev => prev === index ? null : index);
   }, []);
 
   // --- Filter handlers ---
@@ -747,284 +736,25 @@ export default function ExplorerPage() {
 
   // --- Render ---
   return (
-    <div className="flex h-[calc(100vh-3rem)] md:h-screen bg-gray-50">
+    <div className="flex h-[calc(100vh-3rem)] bg-gray-50">
       {/* Left Sidebar */}
-      <aside className="w-56 shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
-        {/* Workspace selector */}
-        <div className="px-3 py-3 border-b border-gray-200">
-          <div className="relative">
-            <select
-              value={selectedWorkspaceId ?? ""}
-              onChange={(e) => setSelectedWorkspaceId(e.target.value || null)}
-              disabled={wsLoading}
-              aria-label="Selectionner un workspace"
-              className="w-full appearance-none rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1.5 pr-7 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-            >
-              {wsLoading && <option value="">Chargement...</option>}
-              {workspaces?.map((ws) => (
-                <option key={ws.id} value={ws.id}>
-                  {ws.name}
-                </option>
-              ))}
-              {!wsLoading && (!workspaces || workspaces.length === 0) && (
-                <option value="">Aucun workspace</option>
-              )}
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
-          </div>
-        </div>
-
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto">
-          {/* Models section */}
-          <div className="py-2">
-            <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Modeles
-            </div>
-            {layerDetail?.definitions_json?.nodes && layerDetail.definitions_json.nodes.length > 0 ? (
-              <div className="space-y-0.5">
-                {layerDetail.definitions_json.nodes.map((node) => {
-                  const isExpanded = expandedModels.has(node.data_source_name);
-                  return (
-                    <div key={node.id}>
-                      <button
-                        type="button"
-                        onClick={() => toggleModel(node.data_source_name)}
-                        className="w-full flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        {isExpanded ? (
-                          <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
-                        ) : (
-                          <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
-                        )}
-                        <span className="font-medium truncate">{node.data_source_name}</span>
-                      </button>
-                      {isExpanded && (
-                        <div className="pl-8 space-y-0.5">
-                          {/* Group columns by type: dimensions first, then measures */}
-                          {(() => {
-                            const dimensions = node.columns.filter(col =>
-                              col.role === 'dimension' || (col.role !== 'measure' && !isNumericType(col.type))
-                            );
-                            const measures = node.columns.filter(col =>
-                              col.role === 'measure' || (col.role !== 'dimension' && isNumericType(col.type))
-                            );
-                            const ignored = node.columns.filter(col => col.role === 'ignore');
-
-                            return (
-                              <>
-                                {dimensions.length > 0 && (
-                                  <div className="pb-1">
-                                    <div className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                                      Dimensions
-                                    </div>
-                                    {dimensions.map((col) => {
-                                      const isSelected = selectedFields.some(
-                                        f => f.name === col.name && f.tableName === node.data_source_name
-                                      );
-                                      const isDimDate = isDateType(col.type);
-                                      const Icon = isDimDate ? CalendarDays : TypeIcon;
-
-                                      return (
-                                        <button
-                                          key={col.name}
-                                          type="button"
-                                          onClick={() => addField(col.name, node.data_source_name, col.type, col.role)}
-                                          disabled={isSelected}
-                                          className={cn(
-                                            "w-full flex items-center gap-1.5 text-left px-2 py-1 text-xs rounded transition-colors",
-                                            isSelected
-                                              ? "text-gray-600 bg-gray-100 cursor-not-allowed"
-                                              : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                                          )}
-                                          title={`${col.name} (${col.type})`}
-                                        >
-                                          <Icon className="h-3 w-3 shrink-0 text-gray-400" />
-                                          <span className="font-mono truncate flex-1">{col.name}</span>
-                                          <Plus className={cn(
-                                            "h-3 w-3 shrink-0",
-                                            isSelected ? "opacity-30" : ""
-                                          )} />
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                                {measures.length > 0 && (
-                                  <div className="pb-1">
-                                    <div className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                                      Mesures
-                                    </div>
-                                    {measures.map((col) => {
-                                      const isSelected = selectedFields.some(
-                                        f => f.name === col.name && f.tableName === node.data_source_name
-                                      );
-
-                                      return (
-                                        <button
-                                          key={col.name}
-                                          type="button"
-                                          onClick={() => addField(col.name, node.data_source_name, col.type, col.role)}
-                                          disabled={isSelected}
-                                          className={cn(
-                                            "w-full flex items-center gap-1.5 text-left px-2 py-1 text-xs rounded transition-colors",
-                                            isSelected
-                                              ? "text-teal-600 bg-teal-50 cursor-not-allowed"
-                                              : "text-teal-600 hover:bg-teal-50"
-                                          )}
-                                          title={`${col.name} (${col.type})`}
-                                        >
-                                          <Hash className="h-3 w-3 shrink-0 text-teal-500" />
-                                          <span className="font-mono truncate flex-1">{col.name}</span>
-                                          <Plus className={cn(
-                                            "h-3 w-3 shrink-0",
-                                            isSelected ? "opacity-30" : ""
-                                          )} />
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                                {ignored.length > 0 && (
-                                  <div className="pb-1">
-                                    <div className="px-2 py-1 text-[10px] font-semibold text-gray-300 uppercase tracking-wider">
-                                      Ignorés
-                                    </div>
-                                    {ignored.map((col) => {
-                                      const isSelected = selectedFields.some(
-                                        f => f.name === col.name && f.tableName === node.data_source_name
-                                      );
-
-                                      return (
-                                        <button
-                                          key={col.name}
-                                          type="button"
-                                          onClick={() => addField(col.name, node.data_source_name, col.type, col.role)}
-                                          disabled={isSelected}
-                                          className={cn(
-                                            "w-full flex items-center gap-1.5 text-left px-2 py-1 text-xs rounded transition-colors opacity-40",
-                                            isSelected
-                                              ? "text-gray-400 bg-gray-50 cursor-not-allowed"
-                                              : "text-gray-400 hover:bg-gray-50"
-                                          )}
-                                          title={`${col.name} (${col.type}) - ignoré`}
-                                        >
-                                          <TypeIcon className="h-3 w-3 shrink-0 text-gray-300" />
-                                          <span className="font-mono truncate flex-1">{col.name}</span>
-                                          <Plus className={cn(
-                                            "h-3 w-3 shrink-0",
-                                            isSelected ? "opacity-30" : ""
-                                          )} />
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="px-3 py-2 text-xs text-gray-400">
-                Aucun modele disponible
-              </p>
-            )}
-          </div>
-
-          {/* Metrics section */}
-          <div className="py-2 border-t border-gray-100">
-            <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Metriques
-            </div>
-            {metrics.length > 0 ? (
-              <div className="space-y-0.5 px-3">
-                {metrics.map((metric, idx) => {
-                  const isSelected = selectedFields.some(
-                    f => f.name === metric.name && f.tableName === metric.tableName
-                  );
-                  return (
-                    <button
-                      key={`${metric.tableName}-${metric.name}-${idx}`}
-                      type="button"
-                      onClick={() => addField(metric.name, metric.tableName, 'numeric')}
-                      disabled={isSelected}
-                      className={cn(
-                        "w-full text-left px-2 py-1 text-xs rounded transition-colors font-mono truncate",
-                        isSelected
-                          ? "text-teal-600 bg-teal-50 cursor-not-allowed"
-                          : "text-teal-600 hover:bg-teal-50"
-                      )}
-                      title={`${metric.name} from ${metric.tableName}`}
-                    >
-                      <span className="mr-1.5">Σ</span>
-                      {metric.name}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="px-3 py-2 text-xs text-gray-400">
-                Aucune metrique disponible
-              </p>
-            )}
-          </div>
-
-          {/* Saved Queries section */}
-          <div className="py-2 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={() => setShowSavedQueries(!showSavedQueries)}
-              className="w-full flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:bg-gray-50 transition-colors"
-            >
-              {showSavedQueries ? (
-                <ChevronDown className="h-3.5 w-3.5" />
-              ) : (
-                <ChevronRight className="h-3.5 w-3.5" />
-              )}
-              Requetes sauvegardees
-            </button>
-            {showSavedQueries && (
-              <div className="space-y-0.5 px-2 mt-1">
-                {savedQueries.length === 0 ? (
-                  <p className="px-2 py-2 text-xs text-gray-400">
-                    Aucune requete
-                  </p>
-                ) : (
-                  savedQueries.map((sq) => (
-                    <div
-                      key={sq.id}
-                      className="group flex items-center gap-1.5 rounded px-2 py-1.5 hover:bg-gray-50 transition-colors"
-                    >
-                      <FileCode className="h-3 w-3 shrink-0 text-teal-500" />
-                      <button
-                        type="button"
-                        className="flex-1 min-w-0 text-left text-xs text-gray-700 truncate"
-                        onClick={() => handleLoadSavedQuery(sq.sql_text)}
-                        title={sq.name}
-                      >
-                        {sq.name}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteSaved(sq.id)}
-                        aria-label={`Supprimer ${sq.name}`}
-                        className="shrink-0 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </aside>
+      <ExplorerSidebar
+        workspaces={workspaces}
+        selectedWorkspaceId={selectedWorkspaceId}
+        setSelectedWorkspaceId={setSelectedWorkspaceId}
+        layerDetail={layerDetail}
+        expandedModels={expandedModels}
+        toggleModel={toggleModel}
+        selectedFields={selectedFields}
+        addField={addField}
+        metrics={metrics}
+        savedQueries={savedQueries}
+        showSavedQueries={showSavedQueries}
+        setShowSavedQueries={setShowSavedQueries}
+        handleLoadSavedQuery={handleLoadSavedQuery}
+        handleDeleteSaved={handleDeleteSaved}
+        wsLoading={wsLoading}
+      />
 
       {/* Main content */}
       <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
@@ -1097,448 +827,32 @@ export default function ExplorerPage() {
         )}
 
         {/* Selected Fields Area */}
-        <div className="border-b border-gray-200 bg-white px-4 py-3">
-          {selectedFields.length === 0 ? (
-            <div className="flex items-center justify-center py-6 text-sm text-gray-400">
-              Cliquez sur les colonnes pour explorer vos données
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                {selectedFields.map((field, index) => {
-                  // Define all aggregation options
-                  const allAggregationOptions: Array<{
-                    value: AggregationType;
-                    label: string;
-                    sql: string;
-                  }> = [
-                    { value: 'none', label: 'Aucune', sql: 'RAW' },
-                    { value: 'SUM', label: 'Somme', sql: 'SUM' },
-                    { value: 'AVG', label: 'Moyenne', sql: 'AVG' },
-                    { value: 'MEDIAN', label: 'Médiane', sql: 'MEDIAN' },
-                    { value: 'MIN', label: 'Minimum', sql: 'MIN' },
-                    { value: 'MAX', label: 'Maximum', sql: 'MAX' },
-                    { value: 'COUNT', label: 'Comptage', sql: 'COUNT' },
-                    { value: 'COUNT_DISTINCT', label: 'Comptage distinct', sql: 'COUNT DISTINCT' },
-                  ];
-
-                  // Filter aggregation options based on type
-                  const aggregationOptions = (() => {
-                    if (isNumericType(field.type)) {
-                      // Numeric: all options
-                      return allAggregationOptions;
-                    } else if (isDateType(field.type) || isTextType(field.type)) {
-                      // Date/Text: only RAW, COUNT, COUNT_DISTINCT
-                      return allAggregationOptions.filter(opt =>
-                        opt.value === 'none' || opt.value === 'COUNT' || opt.value === 'COUNT_DISTINCT'
-                      );
-                    }
-                    return allAggregationOptions;
-                  })();
-
-                  const dateGranularityOptions: Array<{
-                    value: DateGranularity;
-                    label: string;
-                  }> = [
-                    { value: 'raw', label: 'Brut' },
-                    { value: 'year', label: 'Année' },
-                    { value: 'quarter', label: 'Trimestre' },
-                    { value: 'month', label: 'Mois' },
-                    { value: 'week', label: 'Semaine' },
-                    { value: 'day', label: 'Jour' },
-                  ];
-
-                  const isDate = isDateType(field.type);
-                  const isNumeric = isNumericType(field.type);
-                  const isDimension = !isNumeric;
-
-                  return (
-                    <div
-                      key={`${field.tableName}-${field.name}-${index}`}
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm relative",
-                        isDimension
-                          ? "bg-gray-50 border-gray-200"
-                          : "bg-teal-50 border-teal-200"
-                      )}
-                      ref={openDropdownIndex === index ? dropdownRef : (openDateDropdownIndex === index ? dateDropdownRef : null)}
-                    >
-                      {/* Type icon */}
-                      {isDate && <CalendarDays className="h-3 w-3 shrink-0 text-gray-400" />}
-                      {!isDate && isNumeric && <Hash className="h-3 w-3 shrink-0 text-teal-500" />}
-                      {!isDate && !isNumeric && <TypeIcon className="h-3 w-3 shrink-0 text-gray-400" />}
-
-                      <span className="font-mono text-gray-700">
-                        {field.name}
-                        {isDate && field.dateGranularity !== 'raw' && (
-                          <span className="ml-1.5 text-xs text-gray-500">
-                            [{dateGranularityOptions.find(o => o.value === field.dateGranularity)?.label}]
-                          </span>
-                        )}
-                      </span>
-                      <span
-                        className={cn(
-                          "px-2 py-0.5 rounded text-xs font-medium",
-                          field.aggregation === 'none'
-                            ? "bg-gray-100 text-gray-600"
-                            : "bg-teal-600 text-white"
-                        )}
-                      >
-                        {field.aggregation === 'none' ? 'RAW' :
-                         field.aggregation === 'COUNT_DISTINCT' ? 'COUNT DISTINCT' :
-                         field.aggregation}
-                      </span>
-
-                      {/* Date granularity button (only for date columns) */}
-                      {isDate && (
-                        <button
-                          type="button"
-                          onClick={() => toggleDateDropdown(index)}
-                          className="text-gray-400 hover:text-gray-600 transition-colors"
-                          aria-label="Options de granularité"
-                        >
-                          <CalendarDays className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => toggleDropdown(index)}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                        aria-label="Options d'agrégation"
-                      >
-                        <MoreHorizontal className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeField(index)}
-                        className="text-gray-400 hover:text-red-500 transition-colors"
-                        aria-label={`Retirer ${field.name}`}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-
-                      {/* Date granularity dropdown */}
-                      {isDate && openDateDropdownIndex === index && (
-                        <div className="absolute top-full left-0 mt-1 z-50 min-w-[160px] rounded-lg border border-gray-200 bg-white shadow-lg py-1">
-                          {dateGranularityOptions.map((option) => (
-                            <button
-                              key={option.value}
-                              type="button"
-                              onClick={() => setDateGranularity(index, option.value)}
-                              className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-teal-50 transition-colors text-left"
-                            >
-                              <span className="text-gray-700">{option.label}</span>
-                              {field.dateGranularity === option.value && (
-                                <Check className="h-3.5 w-3.5 text-teal-600" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Aggregation dropdown menu */}
-                      {openDropdownIndex === index && (
-                        <div className="absolute top-full left-0 mt-1 z-50 min-w-[200px] rounded-lg border border-gray-200 bg-white shadow-lg py-1">
-                          {aggregationOptions.map((option) => (
-                            <button
-                              key={option.value}
-                              type="button"
-                              onClick={() => setAggregation(index, option.value)}
-                              className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-teal-50 transition-colors text-left"
-                            >
-                              <span className="text-gray-700">{option.label}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-400 font-mono">{option.sql}</span>
-                                {field.aggregation === option.value && (
-                                  <Check className="h-3.5 w-3.5 text-teal-600" />
-                                )}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Filters Section */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowFilters(!showFilters)}
-                    className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 transition-colors"
-                  >
-                    <Filter className="h-3.5 w-3.5" />
-                    Filtres
-                    {filters.length > 0 && (
-                      <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-teal-100 text-teal-700 text-[10px] font-semibold">
-                        {filters.length}
-                      </span>
-                    )}
-                    {showFilters ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                  </button>
-                  {showFilters && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={addFilter}
-                      className="h-6 px-2 text-xs"
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Ajouter un filtre
-                    </Button>
-                  )}
-                </div>
-
-                {showFilters && filters.length > 0 && (
-                  <div className="space-y-2 pl-5">
-                    {filters.map((filter) => {
-                      // Get available columns from all nodes
-                      const allColumns = layerDetail?.definitions_json?.nodes.flatMap(node =>
-                        node.columns
-                          .filter(col => col.role !== 'ignore')
-                          .map(col => ({
-                            name: col.name,
-                            tableName: node.data_source_name,
-                            type: col.type,
-                            label: `${node.data_source_name}.${col.name}`,
-                          }))
-                      ) ?? [];
-
-                      // Get operators for this filter's type
-                      const getOperatorsForType = (type: string) => {
-                        if (isDateType(type)) {
-                          return [
-                            { value: 'date_equals' as const, label: 'Égal' },
-                            { value: 'date_before' as const, label: 'Avant' },
-                            { value: 'date_after' as const, label: 'Après' },
-                            { value: 'date_between' as const, label: 'Entre' },
-                            { value: 'date_last_n_days' as const, label: 'Derniers N jours' },
-                            { value: 'date_last_n_months' as const, label: 'Derniers N mois' },
-                            { value: 'date_this_month' as const, label: 'Ce mois-ci' },
-                            { value: 'date_this_year' as const, label: 'Cette année' },
-                            { value: 'date_last_year' as const, label: 'Année dernière' },
-                          ];
-                        } else if (isNumericType(type)) {
-                          return [
-                            { value: 'equals' as const, label: 'Égal' },
-                            { value: 'not_equals' as const, label: 'Différent' },
-                            { value: 'gt' as const, label: 'Supérieur' },
-                            { value: 'gte' as const, label: 'Supérieur ou égal' },
-                            { value: 'lt' as const, label: 'Inférieur' },
-                            { value: 'lte' as const, label: 'Inférieur ou égal' },
-                            { value: 'between' as const, label: 'Entre' },
-                            { value: 'is_null' as const, label: 'Est vide' },
-                            { value: 'is_not_null' as const, label: "N'est pas vide" },
-                          ];
-                        } else {
-                          return [
-                            { value: 'equals' as const, label: 'Égal' },
-                            { value: 'not_equals' as const, label: 'Différent' },
-                            { value: 'contains' as const, label: 'Contient' },
-                            { value: 'not_contains' as const, label: 'Ne contient pas' },
-                            { value: 'starts_with' as const, label: 'Commence par' },
-                            { value: 'ends_with' as const, label: 'Termine par' },
-                            { value: 'is_null' as const, label: 'Est vide' },
-                            { value: 'is_not_null' as const, label: "N'est pas vide" },
-                          ];
-                        }
-                      };
-
-                      const operators = getOperatorsForType(filter.type);
-                      const needsValue = !['is_null', 'is_not_null', 'date_this_month', 'date_this_year', 'date_last_year'].includes(filter.operator);
-                      const needsValue2 = ['between', 'date_between'].includes(filter.operator);
-
-                      return (
-                        <div key={filter.id} className="flex items-center gap-2 text-xs">
-                          {/* Column selector */}
-                          <select
-                            value={`${filter.tableName}.${filter.column}`}
-                            onChange={(e) => {
-                              const [tableName, ...columnParts] = e.target.value.split('.');
-                              const column = columnParts.join('.');
-                              updateFilter(filter.id, { tableName, column });
-                            }}
-                            className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500"
-                          >
-                            {allColumns.map((col) => (
-                              <option key={col.label} value={col.label}>
-                                {col.label}
-                              </option>
-                            ))}
-                          </select>
-
-                          {/* Operator selector */}
-                          <select
-                            value={filter.operator}
-                            onChange={(e) => updateFilter(filter.id, { operator: e.target.value as FilterOperator })}
-                            className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500"
-                          >
-                            {operators.map((op) => (
-                              <option key={op.value} value={op.value}>
-                                {op.label}
-                              </option>
-                            ))}
-                          </select>
-
-                          {/* Value input */}
-                          {needsValue && (
-                            <input
-                              type={
-                                isDateType(filter.type) && !['date_last_n_days', 'date_last_n_months'].includes(filter.operator)
-                                  ? 'date'
-                                  : isNumericType(filter.type) || ['date_last_n_days', 'date_last_n_months'].includes(filter.operator)
-                                  ? 'number'
-                                  : 'text'
-                              }
-                              value={filter.value}
-                              onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
-                              placeholder="Valeur"
-                              className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500 w-32"
-                            />
-                          )}
-
-                          {/* Second value input for BETWEEN */}
-                          {needsValue2 && (
-                            <input
-                              type={isDateType(filter.type) ? 'date' : isNumericType(filter.type) ? 'number' : 'text'}
-                              value={filter.value2 ?? ''}
-                              onChange={(e) => updateFilter(filter.id, { value2: e.target.value })}
-                              placeholder="Valeur 2"
-                              className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500 w-32"
-                            />
-                          )}
-
-                          {/* Remove button */}
-                          <button
-                            type="button"
-                            onClick={() => removeFilter(filter.id)}
-                            className="text-gray-400 hover:text-red-500 transition-colors"
-                            aria-label="Supprimer le filtre"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Sorts Section */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowSorts(!showSorts)}
-                    className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 transition-colors"
-                  >
-                    <ArrowUpDown className="h-3.5 w-3.5" />
-                    Tri
-                    {sortRules.length > 0 && (
-                      <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-teal-100 text-teal-700 text-[10px] font-semibold">
-                        {sortRules.length}
-                      </span>
-                    )}
-                    {showSorts ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                  </button>
-                  {showSorts && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={addSort}
-                      className="h-6 px-2 text-xs"
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Ajouter un tri
-                    </Button>
-                  )}
-                </div>
-
-                {showSorts && sortRules.length > 0 && (
-                  <div className="space-y-2 pl-5">
-                    {sortRules.map((sort, index) => {
-                      // Get available columns from all nodes
-                      const allColumns = layerDetail?.definitions_json?.nodes.flatMap(node =>
-                        node.columns
-                          .filter(col => col.role !== 'ignore')
-                          .map(col => ({
-                            name: col.name,
-                            tableName: node.data_source_name,
-                            label: `${node.data_source_name}.${col.name}`,
-                          }))
-                      ) ?? [];
-
-                      return (
-                        <div key={index} className="flex items-center gap-2 text-xs">
-                          {/* Column selector */}
-                          <select
-                            value={`${sort.tableName}.${sort.column}`}
-                            onChange={(e) => {
-                              const [tableName, ...columnParts] = e.target.value.split('.');
-                              const column = columnParts.join('.');
-                              updateSort(index, { tableName, column });
-                            }}
-                            className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500"
-                          >
-                            {allColumns.map((col) => (
-                              <option key={col.label} value={col.label}>
-                                {col.label}
-                              </option>
-                            ))}
-                          </select>
-
-                          {/* Direction toggle */}
-                          <select
-                            value={sort.direction}
-                            onChange={(e) => updateSort(index, { direction: e.target.value as 'ASC' | 'DESC' })}
-                            className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500"
-                          >
-                            <option value="ASC">Croissant</option>
-                            <option value="DESC">Décroissant</option>
-                          </select>
-
-                          {/* Remove button */}
-                          <button
-                            type="button"
-                            onClick={() => removeSort(index)}
-                            className="text-gray-400 hover:text-red-500 transition-colors"
-                            aria-label="Supprimer le tri"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* SQL toggle button */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowSql(!showSql)}
-                  className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                  <Code2 className="h-3.5 w-3.5" />
-                  {showSql ? 'Masquer SQL' : 'Afficher SQL'}
-                  {showSql ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                </button>
-                {sqlMode === 'sql' && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 text-xs font-medium">
-                    Mode SQL
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        <SelectedFieldsBar
+          selectedFields={selectedFields}
+          removeField={removeField}
+          updateAggregation={updateAggregation}
+          updateDateGranularity={updateDateGranularity}
+          filters={filters}
+          sorts={sortRules}
+          showFilters={showFilters}
+          showSorts={showSorts}
+          setShowFilters={setShowFilters}
+          setShowSorts={setShowSorts}
+          addFilter={addFilter}
+          updateFilter={updateFilter}
+          removeFilter={removeFilter}
+          addSort={addSort}
+          updateSort={updateSort}
+          removeSort={removeSort}
+          showSql={showSql}
+          setShowSql={setShowSql}
+          sqlMode={sqlMode}
+          layerDetail={layerDetail}
+          openDropdownIndex={openDropdownIndex}
+          setOpenDropdownIndex={setOpenDropdownIndex}
+          openDateDropdownIndex={openDateDropdownIndex}
+          setOpenDateDropdownIndex={setOpenDateDropdownIndex}
+        />
 
         {/* SQL Editor Section */}
         {showSql && (
@@ -1599,40 +913,19 @@ export default function ExplorerPage() {
               </Alert>
             )}
 
-            {result && !execError && (
-              <div className="mb-3 flex items-center gap-4 text-sm text-gray-500 border-b border-gray-100 pb-3">
-                <span className="flex items-center gap-1.5">
-                  <Rows3 className="h-4 w-4" />
-                  {result.row_count.toLocaleString("fr-FR")} ligne{result.row_count > 1 ? "s" : ""}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Clock className="h-4 w-4" />
-                  {result.execution_time_ms < 1000
-                    ? `${Math.round(result.execution_time_ms)} ms`
-                    : `${(result.execution_time_ms / 1000).toFixed(2)} s`}
-                </span>
-                <div className="ml-auto flex items-center gap-2">
-                  <label htmlFor="query-limit" className="text-xs text-gray-600">
-                    Limite:
-                  </label>
-                  <input
-                    id="query-limit"
-                    type="number"
-                    min="10"
-                    max="10000"
-                    step="10"
-                    value={queryLimit}
-                    onChange={(e) => setQueryLimit(Math.max(10, Math.min(10000, parseInt(e.target.value) || 100)))}
-                    className="w-20 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500"
-                  />
-                </div>
-              </div>
-            )}
-
-            <QueryResultTable
-              columns={result?.columns ?? []}
-              rows={result?.rows ?? []}
-              isLoading={isExecuting}
+            <ResultsArea
+              result={result}
+              isExecuting={isExecuting}
+              execError={execError}
+              generatedSql={generatedSql}
+              viewMode={viewMode}
+              setViewMode={setViewMode}
+              chartType={chartType}
+              setChartType={setChartType}
+              autoDetectedChartType={autoDetectedChartType}
+              queryLimit={queryLimit}
+              setQueryLimit={setQueryLimit}
+              selectedFields={selectedFields}
             />
           </div>
         </div>
