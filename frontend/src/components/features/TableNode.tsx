@@ -8,7 +8,7 @@ interface ColumnData {
   role: 'dimension' | 'measure' | 'ignore';
 }
 
-export interface TableNodeData {
+export interface TableNodeData extends Record<string, unknown> {
   label: string;
   columns: ColumnData[];
   dataSourceId: string;

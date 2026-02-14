@@ -28,8 +28,8 @@ const nodeTypes = { tableNode: TableNode };
 
 function ModelCanvas() {
   const reactFlowInstance = useReactFlow();
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [dataSources, setDataSources] = useState<DataSourceListItem[]>([]);
   const [isLoadingSources, setIsLoadingSources] = useState(true);
   const [modelName, setModelName] = useState('Mon modele');
