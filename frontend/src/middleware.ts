@@ -13,7 +13,7 @@ export function middleware(request: NextRequest) {
 
   // Redirect authenticated users away from public pages
   if (isAuthenticated && isPublicPath) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/sources", request.url));
   }
 
   // Redirect unauthenticated users away from protected pages

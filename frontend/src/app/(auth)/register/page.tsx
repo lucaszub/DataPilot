@@ -51,7 +51,8 @@ export default function RegisterPage() {
     setServerError(null);
     try {
       await authRegister(data.email, data.password);
-      router.push("/dashboard");
+      // Force a hard navigation so middleware picks up the new dp_token cookie
+      window.location.href = "/sources";
     } catch (err) {
       if (err instanceof Error) {
         setServerError(err.message);
