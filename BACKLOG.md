@@ -9,10 +9,10 @@
 | Metric | Value | Target |
 |--------|-------|--------|
 | Phase 1 Tasks | 23 | 100% |
-| Completed | 1 | 23 |
+| Completed | 5 | 23 |
 | In Progress | 0 | — |
 | Blocked | 0 | 0 |
-| Completion Rate | 4% | 100% |
+| Completion Rate | 22% | 100% |
 | Timeline | Week 1 | Week 16 |
 
 ---
@@ -38,10 +38,10 @@ Each task has:
 | ID | Task | Status | Effort | Priority | Owner | Depends | Notes |
 |---|------|--------|--------|----------|-------|---------|-------|
 | P1-BACK-01 | Setup PostgreSQL migrations base | `completed` ✅ 2026-02-13 | XS | 1 | Claude | — | PR #2 — 001_initial_schema.py : users, workspaces, data_sources, dashboards, widgets, semantic_layers |
-| P1-BACK-02 | Implement auth service (JWT) | `todo` | S | 1 | — | P1-BACK-01 | register, login, refresh, password hashing with bcrypt |
-| P1-BACK-03 | Implement auth routes (/login, /register, /refresh) | `todo` | S | 1 | — | P1-BACK-02 | Multi-tenant by tenant_id, request/response schemas |
-| P1-BACK-04 | Add auth tests | `todo` | S | 2 | — | P1-BACK-03 | pytest fixtures, AsyncClient tests |
-| P1-CORE-01 | Add multi-tenant isolation (QueryService base) | `todo` | M | 1 | — | P1-BACK-01 | Base class: filter all queries by tenant_id |
+| P1-BACK-02 | Implement auth service (JWT) | `completed` ✅ 2026-02-13 | S | 1 | Claude | P1-BACK-01 | PR #11 — security.py, auth_service.py, schemas/auth.py |
+| P1-BACK-03 | Implement auth routes (/login, /register, /refresh) | `completed` ✅ 2026-02-13 | S | 1 | Claude | P1-BACK-02 | PR #11 — routers/auth.py, dependencies.py, /me endpoint |
+| P1-BACK-04 | Add auth tests | `completed` ✅ 2026-02-13 | S | 2 | Claude | P1-BACK-03 | PR #11 — test_auth.py with pytest fixtures, AsyncClient, 14 test cases |
+| P1-CORE-01 | Add multi-tenant isolation (QueryService base) | `completed` ✅ 2026-02-14 | M | 1 | Claude | P1-BACK-01 | PR #12 — BaseTenantService[ModelType] generic CRUD with tenant_id isolation, 9 tests |
 
 #### Frontend Auth
 | ID | Task | Status | Effort | Priority | Owner | Depends | Notes |
@@ -248,5 +248,5 @@ When `/datapilot-taskmaster validate <task-id>` is run:
 
 ---
 
-**Last updated**: 2026-02-13 by Claude Code
+**Last updated**: 2026-02-14 by Claude Code
 **Next review**: After each sprint completion
