@@ -8,7 +8,7 @@ export default function AuthLayout({
   return (
     <div className="flex min-h-screen bg-white">
       {/* Left panel — branding (hidden on mobile) */}
-      <div className="relative hidden lg:flex lg:w-3/5 flex-col justify-between overflow-hidden bg-indigo-600">
+      <div className="relative hidden lg:flex lg:w-3/5 flex-col justify-between overflow-hidden bg-teal-600">
         {/* Grid pattern background */}
         <div
           className="absolute inset-0"
@@ -21,7 +21,7 @@ export default function AuthLayout({
           }}
         />
         {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/30 via-transparent to-indigo-800/40" />
+        <div className="absolute inset-0 bg-gradient-to-br from-teal-500/30 via-transparent to-teal-800/40" />
 
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between h-full p-12">
@@ -54,7 +54,7 @@ export default function AuthLayout({
               <p className="text-4xl font-bold text-white leading-tight">
                 Connectez vos donnees.
               </p>
-              <p className="text-4xl font-bold text-indigo-200 leading-tight">
+              <p className="text-4xl font-bold text-teal-200 leading-tight">
                 Posez une question.
               </p>
               <p className="text-4xl font-bold text-white leading-tight">
@@ -62,7 +62,7 @@ export default function AuthLayout({
               </p>
             </div>
 
-            <p className="text-lg text-indigo-100 max-w-md leading-relaxed">
+            <p className="text-lg text-teal-100 max-w-md leading-relaxed">
               La Business Intelligence conversationnelle pour les PME
               francaises.
             </p>
@@ -91,14 +91,14 @@ export default function AuthLayout({
                       />
                     </svg>
                   </div>
-                  <span className="text-indigo-100 text-sm">{feature}</span>
+                  <span className="text-teal-100 text-sm">{feature}</span>
                 </li>
               ))}
             </ul>
           </div>
 
           {/* Footer */}
-          <p className="text-xs text-indigo-200/60">
+          <p className="text-xs text-teal-200/60">
             &copy; 2026 DataPilot &mdash; Heberge sur OVH, France
           </p>
         </div>

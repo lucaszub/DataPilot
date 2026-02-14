@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import {
   Play,
@@ -13,10 +13,14 @@ import {
   FileCode,
   X,
   Plus,
+  MoreHorizontal,
+  Check,
+  Code2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { QueryResultTable } from "@/components/features/QueryResultTable";
+import { SqlEditor } from "@/components/features/SqlEditor";
 import { useSavedQueries } from "@/hooks/useQueries";
 import {
   api,
@@ -27,7 +31,7 @@ import {
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-type AggregationType = 'none' | 'SUM' | 'COUNT' | 'AVG' | 'MIN' | 'MAX';
+type AggregationType = 'none' | 'SUM' | 'COUNT' | 'AVG' | 'MIN' | 'MAX' | 'MEDIAN' | 'COUNT_DISTINCT';
 
 interface SelectedField {
   name: string;
@@ -45,6 +49,10 @@ export default function ExplorerPage() {
   const [execError, setExecError] = useState<string | null>(null);
   const [showSql, setShowSql] = useState(false);
 
+  // SQL mode state
+  const [sqlMode, setSqlMode] = useState<'visual' | 'sql'>('visual');
+  const [customSql, setCustomSql] = useState('');
+
   // Saved query UI
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [saveName, setSaveName] = useState("");
@@ -54,6 +62,10 @@ export default function ExplorerPage() {
   // Sidebar state
   const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
   const [showSavedQueries, setShowSavedQueries] = useState(true);
+
+  // Aggregation dropdown state
+  const [openDropdownIndex, setOpenDropdownIndex] = useState<number | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // --- Data fetching ---
   const { data: workspaces, isLoading: wsLoading } = useSWR<WorkspaceResponse[]>(
@@ -95,6 +107,17 @@ export default function ExplorerPage() {
     return allMetrics;
   }, [layerDetail]);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpenDropdownIndex(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // --- SQL Generation with JOIN support ---
   const generatedSql = useMemo(() => {
     if (selectedFields.length === 0) return '';
@@ -107,6 +130,11 @@ export default function ExplorerPage() {
       const selectParts = selectedFields.map(f => {
         const qualifiedName = `${f.tableName}.${f.name}`;
         if (f.aggregation !== 'none') {
+          if (f.aggregation === 'COUNT_DISTINCT') {
+            return `COUNT(DISTINCT ${qualifiedName}) AS ${f.name}_count_distinct`;
+          } else if (f.aggregation === 'MEDIAN') {
+            return `MEDIAN(${qualifiedName}) AS ${f.name}_median`;
+          }
           return `${f.aggregation}(${qualifiedName}) AS ${f.name}_${f.aggregation.toLowerCase()}`;
         }
         return qualifiedName;
@@ -248,6 +276,11 @@ export default function ExplorerPage() {
     const selectParts = selectedFields.map(f => {
       const qualifiedName = `${f.tableName}.${f.name}`;
       if (f.aggregation !== 'none') {
+        if (f.aggregation === 'COUNT_DISTINCT') {
+          return `COUNT(DISTINCT ${qualifiedName}) AS ${f.name}_count_distinct`;
+        } else if (f.aggregation === 'MEDIAN') {
+          return `MEDIAN(${qualifiedName}) AS ${f.name}_median`;
+        }
         return `${f.aggregation}(${qualifiedName}) AS ${f.name}_${f.aggregation.toLowerCase()}`;
       }
       return qualifiedName;
@@ -299,17 +332,31 @@ export default function ExplorerPage() {
     setSelectedFields(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  const cycleAggregation = useCallback((index: number) => {
-    const cycle: AggregationType[] = ['none', 'SUM', 'COUNT', 'AVG', 'MIN', 'MAX'];
+  const setAggregation = useCallback((index: number, aggregation: AggregationType) => {
     setSelectedFields(prev => prev.map((f, i) => {
       if (i !== index) return f;
-      const currentIdx = cycle.indexOf(f.aggregation);
-      return { ...f, aggregation: cycle[(currentIdx + 1) % cycle.length] };
+      return { ...f, aggregation };
     }));
+    setOpenDropdownIndex(null);
   }, []);
 
-  // Auto-execute when fields change (debounced)
+  const toggleDropdown = useCallback((index: number) => {
+    setOpenDropdownIndex(prev => prev === index ? null : index);
+  }, []);
+
+  // Sync generatedSql to customSql when in visual mode
   useEffect(() => {
+    if (sqlMode === 'visual') {
+      setCustomSql(generatedSql);
+    }
+  }, [generatedSql, sqlMode]);
+
+  // Get the current SQL to execute
+  const currentSql = sqlMode === 'sql' ? customSql : generatedSql;
+
+  // Auto-execute when fields change in visual mode (debounced)
+  useEffect(() => {
+    if (sqlMode === 'sql') return; // Don't auto-execute in SQL mode
     if (selectedFields.length === 0 || !selectedWorkspaceId) {
       setResult(null);
       return;
@@ -334,17 +381,19 @@ export default function ExplorerPage() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [selectedFields, selectedWorkspaceId, generatedSql]);
+  }, [selectedFields, selectedWorkspaceId, generatedSql, sqlMode]);
 
   const handleExecute = useCallback(async () => {
-    if (!selectedWorkspaceId || selectedFields.length === 0) return;
+    if (!selectedWorkspaceId) return;
+    const sqlToExecute = sqlMode === 'sql' ? customSql : generatedSql;
+    if (!sqlToExecute.trim()) return;
 
     setIsExecuting(true);
     setExecError(null);
 
     try {
       const response = await api.queries.execute({
-        sql_text: generatedSql,
+        sql_text: sqlToExecute,
         workspace_id: selectedWorkspaceId,
       });
       setResult(response);
@@ -354,17 +403,19 @@ export default function ExplorerPage() {
     } finally {
       setIsExecuting(false);
     }
-  }, [selectedWorkspaceId, selectedFields, generatedSql]);
+  }, [selectedWorkspaceId, customSql, generatedSql, sqlMode]);
 
   async function handleSaveQuery(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedWorkspaceId || !saveName.trim() || selectedFields.length === 0) return;
+    if (!selectedWorkspaceId || !saveName.trim()) return;
+    const sqlToSave = sqlMode === 'sql' ? customSql : generatedSql;
+    if (!sqlToSave.trim()) return;
 
     setIsSaving(true);
     try {
       await api.queries.createSaved({
         name: saveName.trim(),
-        sql_text: generatedSql,
+        sql_text: sqlToSave,
         workspace_id: selectedWorkspaceId,
         chart_type: saveChartType || null,
       });
@@ -565,7 +616,7 @@ export default function ExplorerPage() {
                       key={sq.id}
                       className="group flex items-center gap-1.5 rounded px-2 py-1.5 hover:bg-gray-50 transition-colors"
                     >
-                      <FileCode className="h-3 w-3 shrink-0 text-indigo-500" />
+                      <FileCode className="h-3 w-3 shrink-0 text-teal-500" />
                       <button
                         type="button"
                         className="flex-1 min-w-0 text-left text-xs text-gray-700 truncate"
@@ -601,7 +652,7 @@ export default function ExplorerPage() {
               variant="outline"
               size="sm"
               onClick={() => setShowSaveForm(!showSaveForm)}
-              disabled={selectedFields.length === 0}
+              disabled={sqlMode === 'visual' ? selectedFields.length === 0 : !currentSql.trim()}
               className="gap-1.5"
             >
               <Save className="h-3.5 w-3.5" />
@@ -610,7 +661,7 @@ export default function ExplorerPage() {
             <Button
               size="sm"
               onClick={handleExecute}
-              disabled={isExecuting || !selectedWorkspaceId || selectedFields.length === 0}
+              disabled={isExecuting || !selectedWorkspaceId || (sqlMode === 'visual' ? selectedFields.length === 0 : !currentSql.trim())}
               aria-busy={isExecuting}
               className="gap-1.5 bg-teal-600 hover:bg-teal-700"
             >
@@ -668,39 +719,149 @@ export default function ExplorerPage() {
               Cliquez sur les colonnes pour explorer vos données
             </div>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {selectedFields.map((field, index) => (
-                <div
-                  key={`${field.tableName}-${field.name}-${index}`}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-teal-50 border border-teal-200 px-3 py-1.5 text-sm"
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {selectedFields.map((field, index) => {
+                  const aggregationOptions: Array<{
+                    value: AggregationType;
+                    label: string;
+                    sql: string;
+                  }> = [
+                    { value: 'none', label: 'Aucune', sql: 'RAW' },
+                    { value: 'SUM', label: 'Somme', sql: 'SUM' },
+                    { value: 'AVG', label: 'Moyenne', sql: 'AVG' },
+                    { value: 'MEDIAN', label: 'Médiane', sql: 'MEDIAN' },
+                    { value: 'COUNT', label: 'Comptage', sql: 'COUNT' },
+                    { value: 'COUNT_DISTINCT', label: 'Comptage distinct', sql: 'COUNT DISTINCT' },
+                    { value: 'MIN', label: 'Minimum', sql: 'MIN' },
+                    { value: 'MAX', label: 'Maximum', sql: 'MAX' },
+                  ];
+
+                  return (
+                    <div
+                      key={`${field.tableName}-${field.name}-${index}`}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-teal-50 border border-teal-200 px-3 py-1.5 text-sm relative"
+                      ref={openDropdownIndex === index ? dropdownRef : null}
+                    >
+                      <span className="font-mono text-gray-700">{field.name}</span>
+                      <span
+                        className={cn(
+                          "px-2 py-0.5 rounded text-xs font-medium",
+                          field.aggregation === 'none'
+                            ? "bg-gray-100 text-gray-600"
+                            : "bg-teal-600 text-white"
+                        )}
+                      >
+                        {field.aggregation === 'none' ? 'RAW' :
+                         field.aggregation === 'COUNT_DISTINCT' ? 'COUNT DISTINCT' :
+                         field.aggregation}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleDropdown(index)}
+                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        aria-label="Options d'agrégation"
+                      >
+                        <MoreHorizontal className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeField(index)}
+                        className="text-gray-400 hover:text-red-500 transition-colors"
+                        aria-label={`Retirer ${field.name}`}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+
+                      {/* Dropdown menu */}
+                      {openDropdownIndex === index && (
+                        <div className="absolute top-full left-0 mt-1 z-50 min-w-[200px] rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+                          {aggregationOptions.map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => setAggregation(index, option.value)}
+                              className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-teal-50 transition-colors text-left"
+                            >
+                              <span className="text-gray-700">{option.label}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400 font-mono">{option.sql}</span>
+                                {field.aggregation === option.value && (
+                                  <Check className="h-3.5 w-3.5 text-teal-600" />
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* SQL toggle button */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSql(!showSql)}
+                  className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 transition-colors"
                 >
-                  <span className="font-mono text-gray-700">{field.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => cycleAggregation(index)}
-                    className={cn(
-                      "px-2 py-0.5 rounded text-xs font-medium transition-colors",
-                      field.aggregation === 'none'
-                        ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        : "bg-teal-600 text-white hover:bg-teal-700"
-                    )}
-                    title="Cliquer pour changer l'agrégation"
-                  >
-                    {field.aggregation === 'none' ? 'RAW' : field.aggregation}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeField(index)}
-                    className="text-gray-400 hover:text-red-500 transition-colors"
-                    aria-label={`Retirer ${field.name}`}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
+                  <Code2 className="h-3.5 w-3.5" />
+                  {showSql ? 'Masquer SQL' : 'Afficher SQL'}
+                  {showSql ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                </button>
+                {sqlMode === 'sql' && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 text-xs font-medium">
+                    Mode SQL
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </div>
+
+        {/* SQL Editor Section */}
+        {showSql && (
+          <div className="border-b border-gray-200 bg-white px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-700">Requête SQL</span>
+                {sqlMode === 'sql' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSqlMode('visual');
+                      setCustomSql(generatedSql);
+                    }}
+                    className="text-xs text-teal-600 hover:text-teal-700 underline"
+                  >
+                    Revenir au mode visuel
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="h-[150px]">
+              <SqlEditor
+                value={currentSql}
+                onChange={(value) => {
+                  setCustomSql(value);
+                  if (value !== generatedSql) {
+                    setSqlMode('sql');
+                  }
+                }}
+                onExecute={handleExecute}
+                tables={
+                  layerDetail?.definitions_json?.nodes.reduce((acc, node) => {
+                    acc[node.data_source_name] = node.columns.map(col => col.name);
+                    return acc;
+                  }, {} as Record<string, string[]>) || {}
+                }
+                readOnly={false}
+                placeholder="SELECT * FROM ..."
+              />
+            </div>
+          </div>
+        )}
 
         {/* Main content area */}
         <div className="flex flex-1 flex-col overflow-hidden bg-white">
@@ -719,44 +880,17 @@ export default function ExplorerPage() {
             )}
 
             {result && !execError && (
-              <div className="mb-3 flex items-center justify-between border-b border-gray-100 pb-3">
-                <div className="flex items-center gap-4 text-sm text-gray-500">
-                  <span className="flex items-center gap-1.5">
-                    <Rows3 className="h-4 w-4" />
-                    {result.row_count.toLocaleString("fr-FR")} ligne{result.row_count > 1 ? "s" : ""}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="h-4 w-4" />
-                    {result.execution_time_ms < 1000
-                      ? `${Math.round(result.execution_time_ms)} ms`
-                      : `${(result.execution_time_ms / 1000).toFixed(2)} s`}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowSql(!showSql)}
-                  className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                  {showSql ? (
-                    <>
-                      <ChevronDown className="h-4 w-4" />
-                      Masquer le SQL
-                    </>
-                  ) : (
-                    <>
-                      <ChevronRight className="h-4 w-4" />
-                      Voir le SQL généré
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-
-            {showSql && generatedSql && (
-              <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <pre className="text-sm font-mono text-gray-700 overflow-x-auto whitespace-pre-wrap">
-                  {generatedSql}
-                </pre>
+              <div className="mb-3 flex items-center gap-4 text-sm text-gray-500 border-b border-gray-100 pb-3">
+                <span className="flex items-center gap-1.5">
+                  <Rows3 className="h-4 w-4" />
+                  {result.row_count.toLocaleString("fr-FR")} ligne{result.row_count > 1 ? "s" : ""}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-4 w-4" />
+                  {result.execution_time_ms < 1000
+                    ? `${Math.round(result.execution_time_ms)} ms`
+                    : `${(result.execution_time_ms / 1000).toFixed(2)} s`}
+                </span>
               </div>
             )}
 

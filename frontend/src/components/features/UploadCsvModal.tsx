@@ -165,20 +165,20 @@ export function UploadCsvModal({ onClose, onSuccess }: UploadCsvModalProps) {
               className={cn(
                 "flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-8 text-center cursor-pointer transition-colors",
                 isDragActive
-                  ? "border-indigo-400 bg-indigo-50"
-                  : "border-gray-300 bg-gray-50 hover:border-indigo-400 hover:bg-indigo-50"
+                  ? "border-teal-400 bg-teal-50"
+                  : "border-gray-300 bg-gray-50 hover:border-teal-400 hover:bg-teal-50"
               )}
             >
               <input {...getInputProps()} />
               <Upload
                 className={cn(
                   "mb-3 h-8 w-8",
-                  isDragActive ? "text-indigo-500" : "text-gray-400"
+                  isDragActive ? "text-teal-500" : "text-gray-400"
                 )}
                 aria-hidden="true"
               />
               {isDragActive ? (
-                <p className="text-sm font-medium text-indigo-600">
+                <p className="text-sm font-medium text-teal-600">
                   Deposez les fichiers ici...
                 </p>
               ) : (
@@ -211,7 +211,7 @@ export function UploadCsvModal({ onClose, onSuccess }: UploadCsvModalProps) {
                         : entry.status === "error"
                         ? "border-red-200 bg-red-50"
                         : entry.status === "uploading"
-                        ? "border-indigo-200 bg-indigo-50"
+                        ? "border-teal-200 bg-teal-50"
                         : "border-gray-200 bg-gray-50"
                     )}
                   >
@@ -221,9 +221,9 @@ export function UploadCsvModal({ onClose, onSuccess }: UploadCsvModalProps) {
                     ) : entry.status === "error" ? (
                       <AlertCircle className="h-5 w-5 shrink-0 text-red-500" aria-hidden="true" />
                     ) : entry.status === "uploading" ? (
-                      <div className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" aria-label="Upload en cours" />
+                      <div className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-teal-600 border-t-transparent" aria-label="Upload en cours" />
                     ) : (
-                      <FileText className="h-5 w-5 shrink-0 text-indigo-600" aria-hidden="true" />
+                      <FileText className="h-5 w-5 shrink-0 text-teal-600" aria-hidden="true" />
                     )}
 
                     {/* Name input or display */}
@@ -278,7 +278,7 @@ export function UploadCsvModal({ onClose, onSuccess }: UploadCsvModalProps) {
 
           {/* Upload progress summary */}
           {isUploading && successCount > 0 && (
-            <p className="text-sm text-indigo-600">
+            <p className="text-sm text-teal-600">
               {successCount} / {files.length} fichier{files.length > 1 ? "s" : ""} importe{files.length > 1 ? "s" : ""}...
             </p>
           )}

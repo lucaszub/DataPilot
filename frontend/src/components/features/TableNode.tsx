@@ -64,7 +64,7 @@ export const TableNode = memo(({ data, id }: NodeProps<TableNodeData>) => {
   return (
     <div className="rounded-lg border border-gray-300 bg-white shadow-lg hover:shadow-xl transition-shadow min-w-[280px] group">
       {/* Header with gradient */}
-      <div className="rounded-t-lg bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-3 flex items-center gap-2">
+      <div className="rounded-t-lg bg-gradient-to-r from-teal-600 to-teal-700 px-4 py-3 flex items-center gap-2">
         <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-white/20">
           <Table className="h-4 w-4 text-white" />
         </div>
@@ -72,7 +72,7 @@ export const TableNode = memo(({ data, id }: NodeProps<TableNodeData>) => {
           <h3 className="text-sm font-semibold text-white truncate">
             {data.label}
           </h3>
-          <p className="text-xs text-indigo-100">
+          <p className="text-xs text-teal-100">
             {data.columns.length} colonnes
           </p>
         </div>
@@ -113,7 +113,7 @@ export const TableNode = memo(({ data, id }: NodeProps<TableNodeData>) => {
                 type="source"
                 position={Position.Right}
                 id={`${column.name}-source`}
-                className="!w-2.5 !h-2.5 !bg-indigo-500 !border-2 !border-white opacity-0 group-hover/row:opacity-100 hover:!scale-150 transition-all"
+                className="!w-2.5 !h-2.5 !bg-teal-500 !border-2 !border-white opacity-0 group-hover/row:opacity-100 hover:!scale-150 transition-all"
                 style={{ right: -5 }}
               />
 
@@ -122,7 +122,7 @@ export const TableNode = memo(({ data, id }: NodeProps<TableNodeData>) => {
                 type="target"
                 position={Position.Left}
                 id={`${column.name}-target`}
-                className="!w-2.5 !h-2.5 !bg-indigo-500 !border-2 !border-white opacity-0 group-hover/row:opacity-100 hover:!scale-150 transition-all"
+                className="!w-2.5 !h-2.5 !bg-teal-500 !border-2 !border-white opacity-0 group-hover/row:opacity-100 hover:!scale-150 transition-all"
                 style={{ left: -5 }}
               />
 

@@ -63,17 +63,17 @@ export function DataSourceCard({ source, onDeleted }: DataSourceCardProps) {
       role="article"
       aria-label={`Source de donnees: ${source.name}`}
       onClick={handleCardClick}
-      className="group relative flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer"
+      className="group relative flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md hover:border-teal-200 transition-all cursor-pointer"
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
-            <Database className="h-5 w-5 text-indigo-600" aria-hidden="true" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-50">
+            <Database className="h-5 w-5 text-teal-600" aria-hidden="true" />
           </div>
           <div className="min-w-0">
             <p className="truncate font-semibold text-gray-900">{source.name}</p>
-            <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 uppercase tracking-wide mt-0.5">
+            <span className="inline-flex items-center rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-700 uppercase tracking-wide mt-0.5">
               {source.type}
             </span>
           </div>

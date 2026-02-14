@@ -66,7 +66,7 @@ export default function RegisterPage() {
     <div className="space-y-6">
       {/* Mobile logo (visible only on small screens) */}
       <div className="flex items-center gap-3 lg:hidden">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 shadow-lg">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-600 shadow-lg">
           <svg
             className="h-5 w-5 text-white"
             fill="none"
@@ -92,7 +92,7 @@ export default function RegisterPage() {
           Deja un compte ?{" "}
           <Link
             href="/login"
-            className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
+            className="font-medium text-teal-600 hover:text-teal-500 transition-colors"
           >
             Se connecter
           </Link>

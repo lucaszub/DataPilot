@@ -51,9 +51,9 @@ export default function SourcesPage() {
       ) : sources.length === 0 ? (
         /* Empty state */
         <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-white py-20 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-indigo-50">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-teal-50">
             <Database
-              className="h-8 w-8 text-indigo-400"
+              className="h-8 w-8 text-teal-400"
               aria-hidden="true"
             />
           </div>

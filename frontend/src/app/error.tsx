@@ -16,7 +16,7 @@ export default function Error({
         <p className="text-sm text-gray-500 mb-4">{error.message}</p>
         <button
           onClick={reset}
-          className="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700"
+          className="rounded-md bg-teal-600 px-4 py-2 text-sm text-white hover:bg-teal-700"
         >
           Reessayer
         </button>

@@ -118,15 +118,15 @@ export default function SourceDetailPage() {
           >
             <ArrowLeft className="h-5 w-5" aria-hidden="true" />
           </Button>
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50">
-            <Database className="h-6 w-6 text-indigo-600" aria-hidden="true" />
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-50">
+            <Database className="h-6 w-6 text-teal-600" aria-hidden="true" />
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-2xl font-bold text-gray-900">
               {source.name}
             </h1>
             <div className="mt-1 flex items-center gap-3 text-sm text-gray-500">
-              <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 uppercase">
+              <span className="inline-flex items-center rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-700 uppercase">
                 {source.type}
               </span>
               {source.schema_cache && (
@@ -197,7 +197,7 @@ export default function SourceDetailPage() {
               className={cn(
                 "flex items-center gap-2 border-b-2 pb-3 pt-1 text-sm font-medium transition-colors",
                 activeTab === tab.id
-                  ? "border-indigo-600 text-indigo-600"
+                  ? "border-teal-600 text-teal-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               )}
             >

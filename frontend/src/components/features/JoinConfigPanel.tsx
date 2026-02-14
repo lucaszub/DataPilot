@@ -61,11 +61,11 @@ export function JoinConfigPanel({
   };
 
   return (
-    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[480px] rounded-lg border-2 border-indigo-500 bg-white shadow-2xl">
+    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[480px] rounded-lg border-2 border-teal-500 bg-white shadow-2xl">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-indigo-100 px-4 py-3">
+      <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-teal-50 to-teal-100 px-4 py-3">
         <div className="flex items-center gap-2">
-          <Link2 className="h-5 w-5 text-indigo-600" />
+          <Link2 className="h-5 w-5 text-teal-600" />
           <h3 className="font-semibold text-gray-900">Configuration de la jointure</h3>
         </div>
         <button
@@ -91,7 +91,7 @@ export function JoinConfigPanel({
                 id="source-column"
                 value={sourceColumn}
                 onChange={(e) => setSourceColumn(e.target.value)}
-                className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-10 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-10 text-sm text-gray-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
               >
                 {sourceColumns.map((col) => (
                   <option key={col} value={col}>
@@ -113,7 +113,7 @@ export function JoinConfigPanel({
                 id="target-column"
                 value={targetColumn}
                 onChange={(e) => setTargetColumn(e.target.value)}
-                className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-10 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-10 text-sm text-gray-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
               >
                 {targetColumns.map((col) => (
                   <option key={col} value={col}>

@@ -441,7 +441,7 @@ function ModelCanvas() {
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {isLoadingSources ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+              <Loader2 className="h-6 w-6 animate-spin text-teal-600" />
             </div>
           ) : filteredDataSources.length === 0 ? (
             <div className="text-center py-12">
@@ -462,9 +462,9 @@ function ModelCanvas() {
                   event.dataTransfer.setData('application/datapilot-source', source.id);
                   event.dataTransfer.effectAllowed = 'move';
                 }}
-                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-white hover:border-indigo-400 hover:shadow-md cursor-grab active:cursor-grabbing transition-all"
+                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-white hover:border-teal-400 hover:shadow-md cursor-grab active:cursor-grabbing transition-all"
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-sm">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-teal-600 shadow-sm">
                   <Database className="h-4 w-4 text-white" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -486,7 +486,7 @@ function ModelCanvas() {
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-6 py-3 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-sm">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-teal-600 shadow-sm">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
             <Input
@@ -503,7 +503,7 @@ function ModelCanvas() {
               <div className="flex items-center gap-2">
                 {saveStatus === 'saving' && (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                    <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
                     <span className="text-sm text-gray-600">Sauvegarde...</span>
                   </>
                 )}
@@ -547,8 +547,8 @@ function ModelCanvas() {
           {nodes.length === 0 && !isLoadingSources && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
               <div className="text-center max-w-md">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-100 mb-4">
-                  <Database className="h-8 w-8 text-indigo-600" />
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-teal-100 mb-4">
+                  <Database className="h-8 w-8 text-teal-600" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   Creez votre modele de donnees
@@ -578,7 +578,7 @@ function ModelCanvas() {
           >
             <Controls className="bg-white border border-gray-200 rounded-lg shadow-lg" />
             <MiniMap
-              nodeColor={(node) => '#4F46E5'}
+              nodeColor={(node) => '#0D9488'}
               className="bg-white border border-gray-200 rounded-lg shadow-lg"
             />
             <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#e5e7eb" />

@@ -53,7 +53,7 @@ function AppSidebar() {
       {/* Logo */}
       <SidebarHeader className="px-4 py-4 border-b border-gray-100">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-600">
             <svg
               className="h-5 w-5 text-white"
               fill="none"
@@ -87,7 +87,7 @@ function AppSidebar() {
                   isActive={isActive}
                   className={
                     isActive
-                      ? "bg-indigo-50 text-indigo-700 font-medium hover:bg-indigo-100 hover:text-indigo-700"
+                      ? "bg-teal-50 text-teal-700 font-medium hover:bg-teal-100 hover:text-teal-700"
                       : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                   }
                 >
