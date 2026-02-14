@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, data_sources
+from app.routers import auth, data_sources, semantic_layers, workspaces
 
 app = FastAPI(
     title="DataPilot API",
@@ -20,6 +20,8 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(data_sources.router, prefix="/api/v1/data-sources", tags=["data-sources"])
+app.include_router(workspaces.router, prefix="/api/v1/workspaces", tags=["workspaces"])
+app.include_router(semantic_layers.router, prefix="/api/v1/semantic-layers", tags=["semantic-layers"])
 
 
 @app.get("/health")
