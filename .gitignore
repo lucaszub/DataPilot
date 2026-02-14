@@ -48,3 +48,6 @@ htmlcov/
 
 # Alembic
 *.pyc
+
+# Test data
+test-data/
