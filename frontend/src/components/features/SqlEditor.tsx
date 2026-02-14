@@ -110,6 +110,7 @@ export function SqlEditor({
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const onExecuteRef = useRef(onExecute);
+  const isInternalChange = useRef(false);
 
   onChangeRef.current = onChange;
   onExecuteRef.current = onExecute;
@@ -145,6 +146,7 @@ export function SqlEditor({
         executeKeymap(),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
+            isInternalChange.current = true;
             onChangeRef.current(update.state.doc.toString());
           }
         }),
@@ -167,8 +169,12 @@ export function SqlEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tables, readOnly, placeholder, executeKeymap]);
 
-  // Sync external value changes (e.g., loading a saved query)
+  // Sync external value changes (e.g., loading a saved query or mode switch)
   useEffect(() => {
+    if (isInternalChange.current) {
+      isInternalChange.current = false;
+      return;
+    }
     const view = viewRef.current;
     if (!view) return;
     const currentValue = view.state.doc.toString();

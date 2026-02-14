@@ -17,6 +17,8 @@ import {
   Check,
   Code2,
   CalendarDays,
+  Hash,
+  Type as TypeIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
@@ -42,6 +44,11 @@ interface SelectedField {
   aggregation: AggregationType;
   dateGranularity: DateGranularity;
 }
+
+// --- Type detection helpers ---
+const isNumericType = (type: string) => /int|float|double|decimal|numeric|number|bigint|real/i.test(type);
+const isDateType = (type: string) => /date|time|timestamp/i.test(type);
+const isTextType = (type: string) => !isNumericType(type) && !isDateType(type);
 
 export default function ExplorerPage() {
   // --- State ---
@@ -365,18 +372,31 @@ export default function ExplorerPage() {
   }, [selectedFields, layerDetail]);
 
   // --- Handlers ---
-  const addField = useCallback((columnName: string, tableName: string, colType: string) => {
+  const addField = useCallback((columnName: string, tableName: string, colType: string, colRole?: 'dimension' | 'measure' | 'ignore') => {
     setSelectedFields(prev => {
       // Don't add duplicates
       if (prev.some(f => f.name === columnName && f.tableName === tableName)) {
         return prev;
       }
+
+      // Smart defaults based on role or type
+      let defaultAggregation: AggregationType = 'none';
+      let defaultDateGranularity: DateGranularity = 'raw';
+
+      if (colRole === 'measure' || (colRole !== 'dimension' && isNumericType(colType))) {
+        defaultAggregation = 'SUM';
+      }
+
+      if (isDateType(colType)) {
+        defaultDateGranularity = 'month';
+      }
+
       return [...prev, {
         name: columnName,
         tableName,
         type: colType,
-        aggregation: 'none',
-        dateGranularity: 'raw',
+        aggregation: defaultAggregation,
+        dateGranularity: defaultDateGranularity,
       }];
     });
   }, []);
@@ -396,8 +416,6 @@ export default function ExplorerPage() {
   const toggleDropdown = useCallback((index: number) => {
     setOpenDropdownIndex(prev => prev === index ? null : index);
   }, []);
-
-  const isDateType = (type: string) => /date|time|timestamp/i.test(type);
 
   const setDateGranularity = useCallback((index: number, granularity: DateGranularity) => {
     setSelectedFields(prev => prev.map((f, i) => {
@@ -580,32 +598,128 @@ export default function ExplorerPage() {
                       </button>
                       {isExpanded && (
                         <div className="pl-8 space-y-0.5">
-                          {node.columns.map((col) => {
-                            const isSelected = selectedFields.some(
-                              f => f.name === col.name && f.tableName === node.data_source_name
+                          {/* Group columns by type: dimensions first, then measures */}
+                          {(() => {
+                            const dimensions = node.columns.filter(col =>
+                              col.role === 'dimension' || (col.role !== 'measure' && !isNumericType(col.type))
                             );
+                            const measures = node.columns.filter(col =>
+                              col.role === 'measure' || (col.role !== 'dimension' && isNumericType(col.type))
+                            );
+                            const ignored = node.columns.filter(col => col.role === 'ignore');
+
                             return (
-                              <button
-                                key={col.name}
-                                type="button"
-                                onClick={() => addField(col.name, node.data_source_name, col.type)}
-                                disabled={isSelected}
-                                className={cn(
-                                  "w-full text-left px-2 py-1 text-xs rounded transition-colors font-mono truncate",
-                                  isSelected
-                                    ? "text-teal-600 bg-teal-50 cursor-not-allowed"
-                                    : "text-gray-600 hover:text-teal-600 hover:bg-teal-50"
+                              <>
+                                {dimensions.length > 0 && (
+                                  <div className="pb-1">
+                                    <div className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                                      Dimensions
+                                    </div>
+                                    {dimensions.map((col) => {
+                                      const isSelected = selectedFields.some(
+                                        f => f.name === col.name && f.tableName === node.data_source_name
+                                      );
+                                      const isDimDate = isDateType(col.type);
+                                      const Icon = isDimDate ? CalendarDays : TypeIcon;
+
+                                      return (
+                                        <button
+                                          key={col.name}
+                                          type="button"
+                                          onClick={() => addField(col.name, node.data_source_name, col.type, col.role)}
+                                          disabled={isSelected}
+                                          className={cn(
+                                            "w-full flex items-center gap-1.5 text-left px-2 py-1 text-xs rounded transition-colors",
+                                            isSelected
+                                              ? "text-gray-600 bg-gray-100 cursor-not-allowed"
+                                              : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                                          )}
+                                          title={`${col.name} (${col.type})`}
+                                        >
+                                          <Icon className="h-3 w-3 shrink-0 text-gray-400" />
+                                          <span className="font-mono truncate flex-1">{col.name}</span>
+                                          <Plus className={cn(
+                                            "h-3 w-3 shrink-0",
+                                            isSelected ? "opacity-30" : ""
+                                          )} />
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
                                 )}
-                                title={`${col.name} (${col.type})`}
-                              >
-                                <Plus className={cn(
-                                  "inline-block h-3 w-3 mr-1",
-                                  isSelected ? "opacity-30" : ""
-                                )} />
-                                {col.name}
-                              </button>
+                                {measures.length > 0 && (
+                                  <div className="pb-1">
+                                    <div className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                                      Mesures
+                                    </div>
+                                    {measures.map((col) => {
+                                      const isSelected = selectedFields.some(
+                                        f => f.name === col.name && f.tableName === node.data_source_name
+                                      );
+
+                                      return (
+                                        <button
+                                          key={col.name}
+                                          type="button"
+                                          onClick={() => addField(col.name, node.data_source_name, col.type, col.role)}
+                                          disabled={isSelected}
+                                          className={cn(
+                                            "w-full flex items-center gap-1.5 text-left px-2 py-1 text-xs rounded transition-colors",
+                                            isSelected
+                                              ? "text-teal-600 bg-teal-50 cursor-not-allowed"
+                                              : "text-teal-600 hover:bg-teal-50"
+                                          )}
+                                          title={`${col.name} (${col.type})`}
+                                        >
+                                          <Hash className="h-3 w-3 shrink-0 text-teal-500" />
+                                          <span className="font-mono truncate flex-1">{col.name}</span>
+                                          <Plus className={cn(
+                                            "h-3 w-3 shrink-0",
+                                            isSelected ? "opacity-30" : ""
+                                          )} />
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                                {ignored.length > 0 && (
+                                  <div className="pb-1">
+                                    <div className="px-2 py-1 text-[10px] font-semibold text-gray-300 uppercase tracking-wider">
+                                      Ignorés
+                                    </div>
+                                    {ignored.map((col) => {
+                                      const isSelected = selectedFields.some(
+                                        f => f.name === col.name && f.tableName === node.data_source_name
+                                      );
+
+                                      return (
+                                        <button
+                                          key={col.name}
+                                          type="button"
+                                          onClick={() => addField(col.name, node.data_source_name, col.type, col.role)}
+                                          disabled={isSelected}
+                                          className={cn(
+                                            "w-full flex items-center gap-1.5 text-left px-2 py-1 text-xs rounded transition-colors opacity-40",
+                                            isSelected
+                                              ? "text-gray-400 bg-gray-50 cursor-not-allowed"
+                                              : "text-gray-400 hover:bg-gray-50"
+                                          )}
+                                          title={`${col.name} (${col.type}) - ignoré`}
+                                        >
+                                          <TypeIcon className="h-3 w-3 shrink-0 text-gray-300" />
+                                          <span className="font-mono truncate flex-1">{col.name}</span>
+                                          <Plus className={cn(
+                                            "h-3 w-3 shrink-0",
+                                            isSelected ? "opacity-30" : ""
+                                          )} />
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </>
                             );
-                          })}
+                          })()}
                         </div>
                       )}
                     </div>
@@ -789,7 +903,8 @@ export default function ExplorerPage() {
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2">
                 {selectedFields.map((field, index) => {
-                  const aggregationOptions: Array<{
+                  // Define all aggregation options
+                  const allAggregationOptions: Array<{
                     value: AggregationType;
                     label: string;
                     sql: string;
@@ -798,11 +913,25 @@ export default function ExplorerPage() {
                     { value: 'SUM', label: 'Somme', sql: 'SUM' },
                     { value: 'AVG', label: 'Moyenne', sql: 'AVG' },
                     { value: 'MEDIAN', label: 'Médiane', sql: 'MEDIAN' },
-                    { value: 'COUNT', label: 'Comptage', sql: 'COUNT' },
-                    { value: 'COUNT_DISTINCT', label: 'Comptage distinct', sql: 'COUNT DISTINCT' },
                     { value: 'MIN', label: 'Minimum', sql: 'MIN' },
                     { value: 'MAX', label: 'Maximum', sql: 'MAX' },
+                    { value: 'COUNT', label: 'Comptage', sql: 'COUNT' },
+                    { value: 'COUNT_DISTINCT', label: 'Comptage distinct', sql: 'COUNT DISTINCT' },
                   ];
+
+                  // Filter aggregation options based on type
+                  const aggregationOptions = (() => {
+                    if (isNumericType(field.type)) {
+                      // Numeric: all options
+                      return allAggregationOptions;
+                    } else if (isDateType(field.type) || isTextType(field.type)) {
+                      // Date/Text: only RAW, COUNT, COUNT_DISTINCT
+                      return allAggregationOptions.filter(opt =>
+                        opt.value === 'none' || opt.value === 'COUNT' || opt.value === 'COUNT_DISTINCT'
+                      );
+                    }
+                    return allAggregationOptions;
+                  })();
 
                   const dateGranularityOptions: Array<{
                     value: DateGranularity;
@@ -817,13 +946,25 @@ export default function ExplorerPage() {
                   ];
 
                   const isDate = isDateType(field.type);
+                  const isNumeric = isNumericType(field.type);
+                  const isDimension = !isNumeric;
 
                   return (
                     <div
                       key={`${field.tableName}-${field.name}-${index}`}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-teal-50 border border-teal-200 px-3 py-1.5 text-sm relative"
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm relative",
+                        isDimension
+                          ? "bg-gray-50 border-gray-200"
+                          : "bg-teal-50 border-teal-200"
+                      )}
                       ref={openDropdownIndex === index ? dropdownRef : (openDateDropdownIndex === index ? dateDropdownRef : null)}
                     >
+                      {/* Type icon */}
+                      {isDate && <CalendarDays className="h-3 w-3 shrink-0 text-gray-400" />}
+                      {!isDate && isNumeric && <Hash className="h-3 w-3 shrink-0 text-teal-500" />}
+                      {!isDate && !isNumeric && <TypeIcon className="h-3 w-3 shrink-0 text-gray-400" />}
+
                       <span className="font-mono text-gray-700">
                         {field.name}
                         {isDate && field.dateGranularity !== 'raw' && (
