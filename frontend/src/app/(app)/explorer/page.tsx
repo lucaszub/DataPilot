@@ -16,6 +16,7 @@ import {
   MoreHorizontal,
   Check,
   Code2,
+  CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
@@ -32,12 +33,14 @@ import {
 import { cn } from "@/lib/utils";
 
 type AggregationType = 'none' | 'SUM' | 'COUNT' | 'AVG' | 'MIN' | 'MAX' | 'MEDIAN' | 'COUNT_DISTINCT';
+type DateGranularity = 'raw' | 'year' | 'quarter' | 'month' | 'week' | 'day';
 
 interface SelectedField {
   name: string;
   tableName: string;
   type: string;
   aggregation: AggregationType;
+  dateGranularity: DateGranularity;
 }
 
 export default function ExplorerPage() {
@@ -66,6 +69,10 @@ export default function ExplorerPage() {
   // Aggregation dropdown state
   const [openDropdownIndex, setOpenDropdownIndex] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Date granularity dropdown state
+  const [openDateDropdownIndex, setOpenDateDropdownIndex] = useState<number | null>(null);
+  const dateDropdownRef = useRef<HTMLDivElement>(null);
 
   // --- Data fetching ---
   const { data: workspaces, isLoading: wsLoading } = useSWR<WorkspaceResponse[]>(
@@ -113,6 +120,9 @@ export default function ExplorerPage() {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setOpenDropdownIndex(null);
       }
+      if (dateDropdownRef.current && !dateDropdownRef.current.contains(event.target as Node)) {
+        setOpenDateDropdownIndex(null);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -129,13 +139,28 @@ export default function ExplorerPage() {
     if (tables.length === 1) {
       const selectParts = selectedFields.map(f => {
         const qualifiedName = `${f.tableName}.${f.name}`;
+
+        // Handle date granularity first
+        let baseExpression = qualifiedName;
+        let alias = f.name;
+        if (isDateType(f.type) && f.dateGranularity !== 'raw') {
+          baseExpression = `DATE_TRUNC('${f.dateGranularity}', ${qualifiedName})`;
+          alias = `${f.name}_${f.dateGranularity}`;
+        }
+
+        // Then handle aggregation
         if (f.aggregation !== 'none') {
           if (f.aggregation === 'COUNT_DISTINCT') {
-            return `COUNT(DISTINCT ${qualifiedName}) AS ${f.name}_count_distinct`;
+            return `COUNT(DISTINCT ${baseExpression}) AS ${alias}_count_distinct`;
           } else if (f.aggregation === 'MEDIAN') {
-            return `MEDIAN(${qualifiedName}) AS ${f.name}_median`;
+            return `MEDIAN(${baseExpression}) AS ${alias}_median`;
           }
-          return `${f.aggregation}(${qualifiedName}) AS ${f.name}_${f.aggregation.toLowerCase()}`;
+          return `${f.aggregation}(${baseExpression}) AS ${alias}_${f.aggregation.toLowerCase()}`;
+        }
+
+        // No aggregation
+        if (isDateType(f.type) && f.dateGranularity !== 'raw') {
+          return `${baseExpression} AS ${alias}`;
         }
         return qualifiedName;
       });
@@ -145,7 +170,13 @@ export default function ExplorerPage() {
       if (hasAggregation) {
         const groupByCols = selectedFields
           .filter(f => f.aggregation === 'none')
-          .map(f => `${f.tableName}.${f.name}`);
+          .map(f => {
+            const qualifiedName = `${f.tableName}.${f.name}`;
+            if (isDateType(f.type) && f.dateGranularity !== 'raw') {
+              return `DATE_TRUNC('${f.dateGranularity}', ${qualifiedName})`;
+            }
+            return qualifiedName;
+          });
         if (groupByCols.length > 0) {
           sql += `\nGROUP BY ${groupByCols.join(', ')}`;
         }
@@ -275,13 +306,28 @@ export default function ExplorerPage() {
     // Build SELECT clause with qualified column names
     const selectParts = selectedFields.map(f => {
       const qualifiedName = `${f.tableName}.${f.name}`;
+
+      // Handle date granularity first
+      let baseExpression = qualifiedName;
+      let alias = f.name;
+      if (isDateType(f.type) && f.dateGranularity !== 'raw') {
+        baseExpression = `DATE_TRUNC('${f.dateGranularity}', ${qualifiedName})`;
+        alias = `${f.name}_${f.dateGranularity}`;
+      }
+
+      // Then handle aggregation
       if (f.aggregation !== 'none') {
         if (f.aggregation === 'COUNT_DISTINCT') {
-          return `COUNT(DISTINCT ${qualifiedName}) AS ${f.name}_count_distinct`;
+          return `COUNT(DISTINCT ${baseExpression}) AS ${alias}_count_distinct`;
         } else if (f.aggregation === 'MEDIAN') {
-          return `MEDIAN(${qualifiedName}) AS ${f.name}_median`;
+          return `MEDIAN(${baseExpression}) AS ${alias}_median`;
         }
-        return `${f.aggregation}(${qualifiedName}) AS ${f.name}_${f.aggregation.toLowerCase()}`;
+        return `${f.aggregation}(${baseExpression}) AS ${alias}_${f.aggregation.toLowerCase()}`;
+      }
+
+      // No aggregation
+      if (isDateType(f.type) && f.dateGranularity !== 'raw') {
+        return `${baseExpression} AS ${alias}`;
       }
       return qualifiedName;
     });
@@ -302,7 +348,13 @@ export default function ExplorerPage() {
     if (hasAggregation) {
       const groupByCols = selectedFields
         .filter(f => f.aggregation === 'none')
-        .map(f => `${f.tableName}.${f.name}`);
+        .map(f => {
+          const qualifiedName = `${f.tableName}.${f.name}`;
+          if (isDateType(f.type) && f.dateGranularity !== 'raw') {
+            return `DATE_TRUNC('${f.dateGranularity}', ${qualifiedName})`;
+          }
+          return qualifiedName;
+        });
       if (groupByCols.length > 0) {
         sql += `\nGROUP BY ${groupByCols.join(', ')}`;
       }
@@ -324,6 +376,7 @@ export default function ExplorerPage() {
         tableName,
         type: colType,
         aggregation: 'none',
+        dateGranularity: 'raw',
       }];
     });
   }, []);
@@ -342,6 +395,20 @@ export default function ExplorerPage() {
 
   const toggleDropdown = useCallback((index: number) => {
     setOpenDropdownIndex(prev => prev === index ? null : index);
+  }, []);
+
+  const isDateType = (type: string) => /date|time|timestamp/i.test(type);
+
+  const setDateGranularity = useCallback((index: number, granularity: DateGranularity) => {
+    setSelectedFields(prev => prev.map((f, i) => {
+      if (i !== index) return f;
+      return { ...f, dateGranularity: granularity };
+    }));
+    setOpenDateDropdownIndex(null);
+  }, []);
+
+  const toggleDateDropdown = useCallback((index: number) => {
+    setOpenDateDropdownIndex(prev => prev === index ? null : index);
   }, []);
 
   // Sync generatedSql to customSql when in visual mode
@@ -737,13 +804,34 @@ export default function ExplorerPage() {
                     { value: 'MAX', label: 'Maximum', sql: 'MAX' },
                   ];
 
+                  const dateGranularityOptions: Array<{
+                    value: DateGranularity;
+                    label: string;
+                  }> = [
+                    { value: 'raw', label: 'Brut' },
+                    { value: 'year', label: 'Année' },
+                    { value: 'quarter', label: 'Trimestre' },
+                    { value: 'month', label: 'Mois' },
+                    { value: 'week', label: 'Semaine' },
+                    { value: 'day', label: 'Jour' },
+                  ];
+
+                  const isDate = isDateType(field.type);
+
                   return (
                     <div
                       key={`${field.tableName}-${field.name}-${index}`}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-teal-50 border border-teal-200 px-3 py-1.5 text-sm relative"
-                      ref={openDropdownIndex === index ? dropdownRef : null}
+                      ref={openDropdownIndex === index ? dropdownRef : (openDateDropdownIndex === index ? dateDropdownRef : null)}
                     >
-                      <span className="font-mono text-gray-700">{field.name}</span>
+                      <span className="font-mono text-gray-700">
+                        {field.name}
+                        {isDate && field.dateGranularity !== 'raw' && (
+                          <span className="ml-1.5 text-xs text-gray-500">
+                            [{dateGranularityOptions.find(o => o.value === field.dateGranularity)?.label}]
+                          </span>
+                        )}
+                      </span>
                       <span
                         className={cn(
                           "px-2 py-0.5 rounded text-xs font-medium",
@@ -756,6 +844,19 @@ export default function ExplorerPage() {
                          field.aggregation === 'COUNT_DISTINCT' ? 'COUNT DISTINCT' :
                          field.aggregation}
                       </span>
+
+                      {/* Date granularity button (only for date columns) */}
+                      {isDate && (
+                        <button
+                          type="button"
+                          onClick={() => toggleDateDropdown(index)}
+                          className="text-gray-400 hover:text-gray-600 transition-colors"
+                          aria-label="Options de granularité"
+                        >
+                          <CalendarDays className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => toggleDropdown(index)}
@@ -773,7 +874,26 @@ export default function ExplorerPage() {
                         <X className="h-3.5 w-3.5" />
                       </button>
 
-                      {/* Dropdown menu */}
+                      {/* Date granularity dropdown */}
+                      {isDate && openDateDropdownIndex === index && (
+                        <div className="absolute top-full left-0 mt-1 z-50 min-w-[160px] rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+                          {dateGranularityOptions.map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => setDateGranularity(index, option.value)}
+                              className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-teal-50 transition-colors text-left"
+                            >
+                              <span className="text-gray-700">{option.label}</span>
+                              {field.dateGranularity === option.value && (
+                                <Check className="h-3.5 w-3.5 text-teal-600" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Aggregation dropdown menu */}
                       {openDropdownIndex === index && (
                         <div className="absolute top-full left-0 mt-1 z-50 min-w-[200px] rounded-lg border border-gray-200 bg-white shadow-lg py-1">
                           {aggregationOptions.map((option) => (

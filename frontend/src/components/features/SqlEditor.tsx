@@ -34,7 +34,7 @@ const lightTheme = EditorView.theme({
     overflow: "auto",
   },
   ".cm-content": {
-    caretColor: "#4f46e5",
+    caretColor: "#0d9488",
     padding: "12px 16px",
     minHeight: "120px",
   },
@@ -47,13 +47,13 @@ const lightTheme = EditorView.theme({
     borderRight: "1px solid #e5e7eb",
   },
   ".cm-activeLine": {
-    backgroundColor: "#eef2ff",
+    backgroundColor: "#f0fdfa",
   },
   ".cm-selectionMatch": {
-    backgroundColor: "#c7d2fe",
+    backgroundColor: "#ccfbf1",
   },
   "&.cm-focused .cm-cursor": {
-    borderLeftColor: "#4f46e5",
+    borderLeftColor: "#0d9488",
   },
   ".cm-tooltip-autocomplete": {
     backgroundColor: "white",
