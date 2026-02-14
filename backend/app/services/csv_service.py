@@ -1,5 +1,7 @@
 """CSV upload service — handles file storage and parquet conversion via DuckDB."""
 
+import datetime
+import decimal
 import json
 import os
 import shutil
@@ -12,6 +14,15 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.data_source import DataSource
+
+
+def _json_safe(val: object) -> object:
+    """Convert non-JSON-serializable values (date, datetime, Decimal) to strings."""
+    if isinstance(val, (datetime.date, datetime.datetime)):
+        return val.isoformat()
+    if isinstance(val, decimal.Decimal):
+        return float(val)
+    return val
 
 
 def _get_upload_path(tenant_id: uuid.UUID, ds_id: uuid.UUID) -> Path:
@@ -93,7 +104,10 @@ def _infer_schema(csv_path: Path) -> dict:
             columns.append({"name": name, "type": str(dtype)})
         row_count = rel.count("*").fetchone()[0]
         sample_rows = rel.limit(100).fetchall()
-        sample = [dict(zip(rel.columns, row)) for row in sample_rows]
+        sample = [
+            {col: _json_safe(val) for col, val in zip(rel.columns, row)}
+            for row in sample_rows
+        ]
         return {
             "columns": columns,
             "row_count": row_count,
@@ -211,7 +225,10 @@ def get_csv_preview(
         )
         col_names = [desc[0] for desc in rel.description]
         raw_rows = rel.fetchall()
-        rows = [dict(zip(col_names, row)) for row in raw_rows]
+        rows = [
+            {col: _json_safe(val) for col, val in zip(col_names, row)}
+            for row in raw_rows
+        ]
 
         # Build column schema list from parquet metadata
         describe_rel = conn.execute(
