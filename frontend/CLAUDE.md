@@ -19,13 +19,15 @@ frontend/src/
 │       └── chat/                ← Interface text-to-SQL
 │           └── page.tsx
 ├── components/
-│   ├── ui/                      ← Primitives réutilisables (Button, Input, Card)
+│   ├── ui/                      ← shadcn/ui primitives (Button, Input, Label, Alert) — ne PAS editer sauf via CVA variants
 │   ├── charts/                  ← Wrappers Recharts (BarChart, LineChart, etc.)
 │   │   ├── BarChartWrapper.tsx
 │   │   ├── LineChartWrapper.tsx
 │   │   └── TableView.tsx
 │   ├── layout/                  ← Sidebar, Navbar, PageHeader
-│   └── features/                ← Composants métier (DataSourceCard, ChatMessage)
+│   └── features/                ← Composants metier (DataSourceCard, ChatMessage)
+├── contexts/
+│   └── AuthContext.tsx           ← Provider auth (login/register/logout/user state)
 ├── lib/
 │   ├── api.ts                   ← Client HTTP centralisé
 │   ├── auth.ts                  ← Helpers JWT / session
@@ -37,12 +39,17 @@ frontend/src/
 ```
 
 ## Stack
-- Next.js 15 (App Router, pas Pages Router)
+- Next.js 15.5.12 (App Router, pas Pages Router)
 - TypeScript strict
 - Tailwind CSS v3
+- shadcn/ui primitives manuels (Button, Input, Label, Alert) dans `src/components/ui/`
+- CVA (class-variance-authority) pour variants de composants
+- clsx + tailwind-merge via `cn()` helper dans `src/lib/utils.ts`
+- lucide-react (icones)
 - Recharts (graphiques)
 - SWR (data fetching / cache)
-- React Hook Form + Zod (formulaires)
+- React Hook Form + Zod + @hookform/resolvers (formulaires)
+- Jest + React Testing Library (tests)
 
 ## Backend API
 - URL locale : `http://localhost:8000`
@@ -71,14 +78,25 @@ frontend/src/
 - TOUJOURS inclure le JWT dans les headers via `getAuthHeaders()`
 
 ### Auth
-- JWT stocké en `localStorage` (MVP — migrer vers httpOnly cookie en Phase 2)
-- Middleware `src/middleware.ts` protège le groupe `(app)/`
-- Si 401 → rediriger vers `/login`
+- JWT stocke en `localStorage` + cookie `dp_token` (dual storage)
+- Cookie `dp_token` necessaire car le middleware Next.js (edge runtime) ne peut pas lire localStorage
+- Middleware `src/middleware.ts` protege le groupe `(app)/` en lisant le cookie `dp_token`
+- Si pas de token → rediriger vers `/login`
+- AuthContext (`src/contexts/AuthContext.tsx`) : login/register/logout + hydratation auto via GET /me au mount
+- API client (`src/lib/api.ts`) : refresh token rotation avec pattern isRefreshing + subscribers queue
+- Register : `tenant_id` auto-genere via `crypto.randomUUID()` cote frontend
 
 ## Points critiques
 - Ne jamais exposer l'`ANTHROPIC_API_KEY` côté frontend
 - Valider les données avec Zod avant soumission des formulaires
 - Les charts Recharts sont tous wrappés dans `components/charts/` — ne pas utiliser Recharts directement dans les pages
+
+## Tests
+- Framework : Jest + React Testing Library
+- Fichiers : `src/__tests__/` (Login.test.tsx, Register.test.tsx, etc.)
+- 15 tests passing (login, register, middleware)
+- Mocks : useAuth, useRouter (next/navigation)
+- Commande : `npm run test`
 
 ## Commandes
 ```bash

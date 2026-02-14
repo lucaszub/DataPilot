@@ -9,10 +9,10 @@
 | Metric | Value | Target |
 |--------|-------|--------|
 | Phase 1 Tasks | 23 | 100% |
-| Completed | 5 | 23 |
+| Completed | 9 | 23 |
 | In Progress | 0 | — |
 | Blocked | 0 | 0 |
-| Completion Rate | 22% | 100% |
+| Completion Rate | 39% | 100% |
 | Timeline | Week 1 | Week 16 |
 
 ---
@@ -46,10 +46,10 @@ Each task has:
 #### Frontend Auth
 | ID | Task | Status | Effort | Priority | Owner | Depends | Notes |
 |---|------|--------|--------|----------|-------|---------|-------|
-| P1-FRONT-01 | Login page (React Hook Form + Zod) | `todo` | S | 1 | — | — | Email/password form, error handling, JWT storage |
-| P1-FRONT-02 | Register page | `todo` | S | 1 | — | P1-FRONT-01 | Confirmation, validation, redirect to dashboard |
-| P1-FRONT-03 | Auth middleware & protected routes | `todo` | XS | 1 | — | P1-FRONT-01 | src/middleware.ts, redirect to /login if 401 |
-| P1-FRONT-04 | API client setup (lib/api.ts) | `todo` | S | 1 | — | — | Centralized HTTP client, auth headers, error handling |
+| P1-FRONT-01 | Login page (React Hook Form + Zod) | `completed` ✅ 2026-02-14 | S | 1 | Claude | — | feat/frontend-auth-sprint — shadcn/ui split-screen layout, Zod validation, AuthContext |
+| P1-FRONT-02 | Register page | `completed` ✅ 2026-02-14 | S | 1 | Claude | P1-FRONT-01 | feat/frontend-auth-sprint — password strength, confirmPassword refine, auto tenant_id (crypto.randomUUID()) |
+| P1-FRONT-03 | Auth middleware & protected routes | `completed` ✅ 2026-02-14 | XS | 1 | Claude | P1-FRONT-01 | feat/frontend-auth-sprint — src/middleware.ts, cookie dp_token, redirect to /login if no token |
+| P1-FRONT-04 | API client setup (lib/api.ts) | `completed` ✅ 2026-02-14 | S | 1 | Claude | — | feat/frontend-auth-sprint — JWT refresh rotation, isRefreshing + subscribers pattern, error interceptor |
 
 ---
 
@@ -248,5 +248,5 @@ When `/datapilot-taskmaster validate <task-id>` is run:
 
 ---
 
-**Last updated**: 2026-02-14 by Claude Code
+**Last updated**: 2026-02-14 by Claude Code (after frontend auth sprint)
 **Next review**: After each sprint completion

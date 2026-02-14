@@ -23,6 +23,9 @@ Alternative française à Omni Analytics — hébergement souverain OVH, IA en f
 | IA | Claude API (claude-sonnet-4-5-20250929) |
 | Query engine | DuckDB (CSV) + SQLAlchemy (DB) |
 | Frontend | Next.js 15 + Tailwind + TypeScript |
+| UI Components | shadcn/ui (primitives manuels) + CVA + Radix UI |
+| Forms | React Hook Form + Zod |
+| Data fetching | SWR |
 | Charts | Recharts |
 | Reverse proxy | Nginx + Certbot |
 
@@ -32,6 +35,15 @@ Alternative française à Omni Analytics — hébergement souverain OVH, IA en f
 - TOUJOURS filtrer par tenant_id dans les queries (multi-tenant critique)
 - Variables d'env : toujours via app/config.py (pydantic-settings)
 - Migrations : toujours via Alembic, jamais modifier les tables manuellement
+
+## Frontend — Structure & Patterns
+- Composants UI : `frontend/src/components/ui/` (shadcn primitives : Button, Input, Label, Alert)
+- Contexts : `frontend/src/contexts/` (AuthContext pour login/register/logout)
+- Lib : `frontend/src/lib/` (api.ts client HTTP, auth.ts helpers JWT, utils.ts cn() helper)
+- Tests : `frontend/src/__tests__/` (Jest + React Testing Library)
+- Middleware : `frontend/src/middleware.ts` (protection routes via cookie `dp_token`)
+- Auth cookie : `dp_token` en cookie + localStorage (middleware Next.js ne peut pas lire localStorage)
+- API client : refresh token rotation avec pattern isRefreshing + subscribers queue
 
 ## Endpoints API — Préfixe /api/v1/
 - /auth → login, register, refresh
