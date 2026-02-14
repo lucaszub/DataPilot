@@ -22,7 +22,7 @@ import { Save, Database, Loader2 } from 'lucide-react';
 import { TableNode, type TableNodeData } from '@/components/features/TableNode';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { api, type DataSourceListItem, type DataSourceDetail, type SemanticLayerDefinitions } from '@/lib/api';
+import { api, type DataSourceListItem, type DataSourceDetail, type SemanticLayerDefinitions, type SemanticLayerDetail } from '@/lib/api';
 
 const nodeTypes = { tableNode: TableNode };
 
@@ -35,6 +35,62 @@ function ModelCanvas() {
   const [modelName, setModelName] = useState('Mon modele');
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [currentLayerId, setCurrentLayerId] = useState<string | null>(null);
+
+  // Fetch or create default workspace, then load existing semantic layer
+  useEffect(() => {
+    async function initWorkspaceAndModel() {
+      try {
+        // Get or create a default workspace
+        let wsId: string;
+        const workspaces = await api.workspaces.list();
+        if (workspaces.length > 0) {
+          wsId = workspaces[0].id;
+        } else {
+          const ws = await api.workspaces.create({ name: 'Espace par defaut' });
+          wsId = ws.id;
+        }
+        setWorkspaceId(wsId);
+
+        // Load existing semantic layer for this workspace (if any)
+        const layers = await api.semanticLayers.list(wsId);
+        if (layers.length > 0) {
+          const layer = await api.semanticLayers.getById(layers[0].id);
+          setCurrentLayerId(layer.id);
+          setModelName(layer.name);
+
+          // Restore nodes and edges from definitions_json
+          if (layer.definitions_json) {
+            const restoredNodes = layer.definitions_json.nodes.map((n) => ({
+              id: n.id,
+              type: 'tableNode' as const,
+              position: n.position,
+              data: {
+                label: n.data_source_name,
+                columns: n.columns,
+                dataSourceId: n.data_source_id,
+              },
+            }));
+            const restoredEdges = layer.definitions_json.edges.map((e) => ({
+              id: e.id,
+              source: e.source_node,
+              target: e.target_node,
+              sourceHandle: `${e.source_column}-source`,
+              targetHandle: `${e.target_column}-target`,
+              type: 'smoothstep' as const,
+            }));
+            setNodes(restoredNodes);
+            setEdges(restoredEdges);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to init workspace/model:', error);
+      }
+    }
+
+    initWorkspaceAndModel();
+  }, [setNodes, setEdges]);
 
   // Fetch data sources on mount
   useEffect(() => {
@@ -110,11 +166,16 @@ function ModelCanvas() {
   }, [reactFlowInstance, setNodes]);
 
   const handleSave = useCallback(async () => {
+    if (!workspaceId) {
+      setSaveMessage('Workspace non disponible');
+      setTimeout(() => setSaveMessage(null), 3000);
+      return;
+    }
+
     setIsSaving(true);
     setSaveMessage(null);
 
     try {
-      // Convert ReactFlow nodes/edges to SemanticLayerDefinitions format
       const definitions: SemanticLayerDefinitions = {
         nodes: nodes.map(node => ({
           id: node.id,
@@ -133,16 +194,21 @@ function ModelCanvas() {
         })),
       };
 
-      // For now, we'll create a new semantic layer each time
-      // In a real app, you'd track if we're editing an existing one
-      // and use workspace_id from context/auth
-      const workspaceId = '00000000-0000-0000-0000-000000000000'; // TODO: get from workspace context
-
-      await api.semanticLayers.create({
-        workspace_id: workspaceId,
-        name: modelName,
-        definitions_json: definitions,
-      });
+      if (currentLayerId) {
+        // Update existing semantic layer
+        await api.semanticLayers.update(currentLayerId, {
+          name: modelName,
+          definitions_json: definitions,
+        });
+      } else {
+        // Create new semantic layer
+        const created = await api.semanticLayers.create({
+          workspace_id: workspaceId,
+          name: modelName,
+          definitions_json: definitions,
+        });
+        setCurrentLayerId(created.id);
+      }
 
       setSaveMessage('Modele sauvegarde avec succes');
       setTimeout(() => setSaveMessage(null), 3000);
@@ -153,7 +219,7 @@ function ModelCanvas() {
     } finally {
       setIsSaving(false);
     }
-  }, [nodes, edges, modelName]);
+  }, [nodes, edges, modelName, workspaceId, currentLayerId]);
 
   return (
     <div className="flex h-[calc(100vh-4rem)]">

@@ -339,6 +339,35 @@ const dataSourcesApi = {
   },
 };
 
+// --- Workspace Types ---
+
+export interface WorkspaceResponse {
+  id: string;
+  tenant_id: string;
+  name: string;
+  settings: Record<string, unknown> | null;
+  created_at: string;
+}
+
+// --- Workspaces API ---
+
+const workspacesApi = {
+  list(skip = 0, limit = 100): Promise<WorkspaceResponse[]> {
+    return request<WorkspaceResponse[]>(`/api/v1/workspaces/?skip=${skip}&limit=${limit}`);
+  },
+
+  getById(id: string): Promise<WorkspaceResponse> {
+    return request<WorkspaceResponse>(`/api/v1/workspaces/${id}`);
+  },
+
+  create(data: { name: string; settings?: Record<string, unknown> }): Promise<WorkspaceResponse> {
+    return request<WorkspaceResponse>('/api/v1/workspaces/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+};
+
 // --- Semantic Layers API ---
 
 const semanticLayersApi = {
@@ -371,6 +400,7 @@ const semanticLayersApi = {
 
 export const api = {
   auth: authApi,
+  workspaces: workspacesApi,
   dataSources: dataSourcesApi,
   semanticLayers: semanticLayersApi,
 };
