@@ -1,252 +1,217 @@
 # DataPilot — Backlog & Task Tracking
 
-> **MVP Phase 1** — Mois 1–4 | Status: 🚀 In Progress | Last updated: 2026-02-13
+> **MVP Phase 1 (CSV-first)** — Status: In Progress | Last updated: 2026-02-14
 
 ---
 
-## 📊 Project Status Overview
+## Project Status Overview
 
 | Metric | Value | Target |
 |--------|-------|--------|
-| Phase 1 Tasks | 23 | 100% |
-| Completed | 9 | 23 |
+| Phase 1 Tasks | 35 | 100% |
+| Completed | 12 | 35 |
 | In Progress | 0 | — |
 | Blocked | 0 | 0 |
-| Completion Rate | 39% | 100% |
-| Timeline | Week 1 | Week 16 |
+| Completion Rate | 34% | 100% |
 
 ---
 
-## 📋 Backlog Structure
+## Backlog Structure
 
 Each task has:
-- **ID**: PHASE-AREA-## (e.g., P1-BACK-01)
+- **ID**: PHASE-AREA-## (e.g., P1-CSV-01)
 - **Status**: `todo` | `in_progress` | `completed` | `blocked`
 - **Effort**: T-shirt sizing (XS, S, M, L)
 - **Priority**: 1 (critical path) → 3 (nice-to-have)
 - **Depends on**: Task IDs
 - **Owner**: assignee
-- **Notes**: technical details, links, blockers
 
 ---
 
-## 🎯 Phase 1: MVP (Mois 1–4)
+## Phase 1: MVP CSV-First
 
-### Sprint 1: Foundation & Auth (Week 1–2)
+### Sprint 1: Foundation & Auth (COMPLETED)
 
 #### Backend Infrastructure
-| ID | Task | Status | Effort | Priority | Owner | Depends | Notes |
-|---|------|--------|--------|----------|-------|---------|-------|
-| P1-BACK-01 | Setup PostgreSQL migrations base | `completed` ✅ 2026-02-13 | XS | 1 | Claude | — | PR #2 — 001_initial_schema.py : users, workspaces, data_sources, dashboards, widgets, semantic_layers |
-| P1-BACK-02 | Implement auth service (JWT) | `completed` ✅ 2026-02-13 | S | 1 | Claude | P1-BACK-01 | PR #11 — security.py, auth_service.py, schemas/auth.py |
-| P1-BACK-03 | Implement auth routes (/login, /register, /refresh) | `completed` ✅ 2026-02-13 | S | 1 | Claude | P1-BACK-02 | PR #11 — routers/auth.py, dependencies.py, /me endpoint |
-| P1-BACK-04 | Add auth tests | `completed` ✅ 2026-02-13 | S | 2 | Claude | P1-BACK-03 | PR #11 — test_auth.py with pytest fixtures, AsyncClient, 14 test cases |
-| P1-CORE-01 | Add multi-tenant isolation (QueryService base) | `completed` ✅ 2026-02-14 | M | 1 | Claude | P1-BACK-01 | PR #12 — BaseTenantService[ModelType] generic CRUD with tenant_id isolation, 9 tests |
+| ID | Task | Status | Effort | Priority | Depends | Notes |
+|---|------|--------|--------|----------|---------|-------|
+| P1-BACK-01 | Setup PostgreSQL migrations base | `completed` | XS | 1 | — | PR #2 |
+| P1-BACK-02 | Implement auth service (JWT) | `completed` | S | 1 | P1-BACK-01 | PR #11 |
+| P1-BACK-03 | Implement auth routes (/login, /register, /refresh) | `completed` | S | 1 | P1-BACK-02 | PR #11 |
+| P1-BACK-04 | Add auth tests | `completed` | S | 2 | P1-BACK-03 | PR #11 — 14 test cases |
+| P1-CORE-01 | Multi-tenant isolation (BaseTenantService) | `completed` | M | 1 | P1-BACK-01 | PR #12 — 9 tests |
 
 #### Frontend Auth
-| ID | Task | Status | Effort | Priority | Owner | Depends | Notes |
-|---|------|--------|--------|----------|-------|---------|-------|
-| P1-FRONT-01 | Login page (React Hook Form + Zod) | `completed` ✅ 2026-02-14 | S | 1 | Claude | — | feat/frontend-auth-sprint — shadcn/ui split-screen layout, Zod validation, AuthContext |
-| P1-FRONT-02 | Register page | `completed` ✅ 2026-02-14 | S | 1 | Claude | P1-FRONT-01 | feat/frontend-auth-sprint — password strength, confirmPassword refine, auto tenant_id (crypto.randomUUID()) |
-| P1-FRONT-03 | Auth middleware & protected routes | `completed` ✅ 2026-02-14 | XS | 1 | Claude | P1-FRONT-01 | feat/frontend-auth-sprint — src/middleware.ts, cookie dp_token, redirect to /login if no token |
-| P1-FRONT-04 | API client setup (lib/api.ts) | `completed` ✅ 2026-02-14 | S | 1 | Claude | — | feat/frontend-auth-sprint — JWT refresh rotation, isRefreshing + subscribers pattern, error interceptor |
+| ID | Task | Status | Effort | Priority | Depends | Notes |
+|---|------|--------|--------|----------|---------|-------|
+| P1-FRONT-01 | Login page | `completed` | S | 1 | — | shadcn/ui + Zod |
+| P1-FRONT-02 | Register page | `completed` | S | 1 | P1-FRONT-01 | password strength + confirmPassword |
+| P1-FRONT-03 | Auth middleware & protected routes | `completed` | XS | 1 | P1-FRONT-01 | cookie dp_token |
+| P1-FRONT-04 | API client setup (lib/api.ts) | `completed` | S | 1 | — | JWT refresh rotation |
 
 ---
 
-### Sprint 2: Data Connectors (Week 3–4)
+### Sprint 2: CSV Upload & Preview (Week 3-4)
 
-#### Connector Service
-| ID | Task | Status | Effort | Priority | Owner | Depends | Notes |
-|---|------|--------|--------|----------|-------|---------|-------|
-| P1-BACK-05 | Implement connector service (base) | `todo` | M | 1 | — | P1-CORE-01 | test_connection, get_schema, encrypt/decrypt config (Fernet) |
-| P1-BACK-06 | PostgreSQL connector | `todo` | M | 1 | — | P1-BACK-05 | Connection pooling, schema introspection (information_schema) |
-| P1-BACK-07 | MySQL connector | `todo` | M | 2 | — | P1-BACK-05 | Similar to PostgreSQL, MySQL-specific schema queries |
-| P1-BACK-08 | CSV/file connector (DuckDB) | `todo` | S | 2 | — | P1-BACK-05 | Upload handling, schema inference, queries via DuckDB |
-| P1-BACK-09 | Data sources CRUD routes | `todo` | M | 1 | — | P1-BACK-08 | POST/GET/PUT/DELETE, test_connection endpoint |
+#### Backend CSV Service
+| ID | Task | Status | Effort | Priority | Depends | Notes |
+|---|------|--------|--------|----------|---------|-------|
+| P1-CSV-01 | CSV upload service | `completed` | M | 1 | P1-CORE-01 | FastAPI UploadFile, filesystem storage /var/datapilot/uploads/{tenant_id}/{ds_id}/, parquet conversion via DuckDB |
+| P1-CSV-02 | Schema inference via DuckDB | `completed` | S | 1 | P1-CSV-01 | Detect column names, types, sample rows (first 100), row count |
+| P1-CSV-03 | Data sources CRUD routes (CSV only) | `completed` | M | 1 | P1-CSV-02 | POST upload, GET list, GET by id, DELETE (+ cleanup file), GET preview (paginated rows) |
 
-#### Frontend Data Sources
-| ID | Task | Status | Effort | Priority | Owner | Depends | Notes |
-|---|------|--------|--------|----------|-------|---------|-------|
-| P1-FRONT-05 | Data sources list page | `todo` | S | 1 | — | P1-FRONT-04 | Display existing connections, delete, test |
-| P1-FRONT-06 | Data source creation form | `todo` | M | 1 | — | P1-FRONT-05 | Wizard: select type → fill credentials → test → save |
-| P1-FRONT-07 | PostgreSQL form (specific fields) | `todo` | XS | 1 | — | P1-FRONT-06 | host, port, username, password, database |
-| P1-FRONT-08 | MySQL form | `todo` | XS | 2 | — | P1-FRONT-06 | Same as PostgreSQL |
-| P1-FRONT-09 | CSV upload form | `todo` | S | 2 | — | P1-FRONT-06 | File picker, upload, schema preview |
+#### Frontend CSV Upload
+| ID | Task | Status | Effort | Priority | Depends | Notes |
+|---|------|--------|--------|----------|---------|-------|
+| P1-CSV-04 | App sidebar layout | `todo` | M | 1 | P1-FRONT-04 | Navigation sidebar: Sources, Model, Explore, Dashboards, Settings. User menu + logout |
+| P1-CSV-05 | CSV upload page (drag & drop) | `todo` | M | 1 | P1-CSV-04 | react-dropzone, multi-file upload, progress bar, file type validation (.csv) |
+| P1-CSV-06 | Data sources list page | `todo` | S | 1 | P1-CSV-05 | Cards with name, row count, column count, upload date. Delete action |
+| P1-CSV-07 | Schema preview & data table | `todo` | S | 1 | P1-CSV-06 | Column names + inferred types, paginated data preview table |
 
 ---
 
-### Sprint 3: AI & Query Engine (Week 5–8)
+### Sprint 3: Semantic Model (Week 5-6)
 
-#### Query & AI Service
-| ID | Task | Status | Effort | Priority | Owner | Depends | Notes |
-|---|------|--------|--------|----------|-------|---------|-------|
-| P1-BACK-10 | Implement query service (base) | `todo` | M | 1 | — | P1-CORE-01 | SQL sanitization, tenant_id filtering, execution abstraction |
-| P1-BACK-11 | Implement AI service (base) | `todo` | M | 1 | — | — | Claude API client setup, prompt engineering |
-| P1-BACK-12 | Text-to-SQL prompt engineering | `todo` | L | 1 | — | P1-BACK-11 | Schema context, natural language → SQL, test queries |
-| P1-BACK-13 | AI endpoint (/ai/query) | `todo` | M | 1 | — | P1-BACK-12 | POST {question, data_source_id} → {sql, results, chart_suggestion} |
-| P1-BACK-14 | Execute queries (DuckDB/SQLAlchemy) | `todo` | M | 1 | — | P1-BACK-10 | Abstract query execution for DB or CSV |
-| P1-BACK-15 | Chart type suggestion | `todo` | S | 2 | — | P1-BACK-14 | Analyze results → suggest bar/line/pie/table |
+#### Backend Semantic Layer
+| ID | Task | Status | Effort | Priority | Depends | Notes |
+|---|------|--------|--------|----------|---------|-------|
+| P1-SEM-01 | Semantic layer CRUD routes | `todo` | S | 1 | P1-CSV-03 | Save/load definitions_json (nodes, edges, column roles). One semantic layer per workspace |
+| P1-SEM-02 | SemanticQueryBuilder (DuckDB cross-CSV) | `todo` | L | 1 | P1-SEM-01 | Create DuckDB views from CSV files, apply JOINs from edges, execute queries in semantic context |
 
-#### Frontend Chat & Visualization
-| ID | Task | Status | Effort | Priority | Owner | Depends | Notes |
-|---|------|--------|--------|----------|-------|---------|-------|
-| P1-FRONT-10 | Chat interface (question input) | `todo` | M | 1 | — | P1-FRONT-05 | Input field, send button, loading state |
-| P1-FRONT-11 | Chat messages display | `todo` | M | 1 | — | P1-FRONT-10 | User/assistant message bubbles, SQL preview |
-| P1-FRONT-12 | Recharts integration (wrapper components) | `todo` | M | 1 | — | — | BarChart, LineChart, PieChart, Table wrappers |
-| P1-FRONT-13 | Chart rendering from AI results | `todo` | M | 1 | — | P1-FRONT-12 | Render chart based on suggestion, handle errors |
-| P1-FRONT-14 | Query result display (table + chart) | `todo` | S | 1 | — | P1-FRONT-13 | Toggle view, pagination, export CSV |
+#### Frontend ERD Editor (ReactFlow)
+| ID | Task | Status | Effort | Priority | Depends | Notes |
+|---|------|--------|--------|----------|---------|-------|
+| P1-SEM-03 | ERD canvas with ReactFlow | `todo` | L | 1 | P1-CSV-07 | TableNode custom component (name, columns list), drag to position, zoom/pan |
+| P1-SEM-04 | Edge builder (drag handle to handle) | `todo` | M | 1 | P1-SEM-03 | Connect columns between tables to define joins (LEFT/INNER). Visual edge with join type label |
+| P1-SEM-05 | Column role tagger (dimension/measure) | `todo` | S | 1 | P1-SEM-03 | Click column → toggle dimension/measure/ignore. Visual indicator (D/M icon + color) |
 
 ---
 
-### Sprint 4: Dashboards & Layout (Week 9–12)
+### Sprint 4: AI + SQL Editor (Week 7-9)
 
-#### Dashboards CRUD
-| ID | Task | Status | Effort | Priority | Owner | Depends | Notes |
-|---|------|--------|--------|----------|-------|---------|-------|
-| P1-BACK-16 | Dashboards model + migrations | `todo` | S | 1 | — | P1-BACK-01 | layout_json, workspace_id, tenant_id |
-| P1-BACK-17 | Widgets model (queries stored in dashboards) | `todo` | S | 1 | — | P1-BACK-16 | query_json, chart_type, position in grid |
-| P1-BACK-18 | Dashboards CRUD routes | `todo` | M | 1 | — | P1-BACK-17 | POST/GET/PUT/DELETE, list dashboards |
-| P1-BACK-19 | Workspaces CRUD | `todo` | S | 1 | — | P1-BACK-01 | Create workspace, multi-workspace isolation |
+#### Backend AI Service
+| ID | Task | Status | Effort | Priority | Depends | Notes |
+|---|------|--------|--------|----------|---------|-------|
+| P1-AI-01 | LLM Provider abstraction + Claude adapter | `todo` | M | 1 | — | Abstract LLMProvider class, ClaudeProvider, OpenAIProvider. Factory pattern based on api_key config |
+| P1-AI-02 | API Keys table + CRUD routes | `todo` | S | 1 | P1-CORE-01 | New table api_keys (id, tenant_id, provider, encrypted_key, model_id, is_active). Fernet encryption |
+| P1-AI-03 | /ai/query endpoint (text-to-SQL) | `todo` | M | 1 | P1-AI-01, P1-SEM-02 | POST {question, workspace_id} → {sql, results, chart_suggestion, explanation}. Uses semantic context |
+| P1-AI-04 | Query execution service | `todo` | M | 1 | P1-SEM-02 | Execute SQL on DuckDB semantic model, return DataFrame as JSON, sanitize user SQL |
+
+#### Frontend AI & SQL
+| ID | Task | Status | Effort | Priority | Depends | Notes |
+|---|------|--------|--------|----------|---------|-------|
+| P1-AI-05 | API Keys settings page | `todo` | S | 1 | P1-CSV-04 | Multi-provider: select provider (Claude/OpenAI), paste key, select model, validate, toggle active |
+| P1-AI-06 | Chat/Explore interface | `todo` | M | 1 | P1-AI-05 | Question input, send button, loading state, AI response display (SQL + explanation) |
+| P1-AI-07 | SQL editor (CodeMirror) | `todo` | M | 2 | P1-SEM-05 | CodeMirror 6 + @codemirror/lang-sql, autocompletion from semantic schema (table/column names) |
+| P1-AI-08 | Query result display (table + chart) | `todo` | M | 1 | P1-AI-06 | Data table with pagination, auto chart suggestion rendering, toggle table/chart view |
+
+---
+
+### Sprint 5: Dashboard Builder (Week 10-12)
+
+#### Backend Dashboards
+| ID | Task | Status | Effort | Priority | Depends | Notes |
+|---|------|--------|--------|----------|---------|-------|
+| P1-DASH-01 | Dashboards + Widgets CRUD routes | `todo` | M | 1 | P1-CORE-01 | Dashboard: name, layout_json, workspace_id. Widget: query_json, chart_type, position, size |
+| P1-DASH-02 | Workspaces CRUD routes | `todo` | S | 1 | P1-CORE-01 | Create/list/update/delete workspaces |
 
 #### Frontend Dashboard Editor
-| ID | Task | Status | Effort | Priority | Owner | Depends | Notes |
-|---|------|--------|--------|----------|-------|---------|-------|
-| P1-FRONT-15 | Workspace switcher | `todo` | XS | 2 | — | P1-FRONT-02 | Sidebar dropdown, switch workspaces |
-| P1-FRONT-16 | Dashboards list page | `todo` | S | 1 | — | P1-FRONT-05 | Display all dashboards, create/edit/delete |
-| P1-FRONT-17 | Dashboard view (read-only) | `todo` | M | 1 | — | P1-FRONT-16 | Display widgets, real-time chart rendering |
-| P1-FRONT-18 | Dashboard edit mode (basic grid) | `todo` | L | 1 | — | P1-FRONT-17 | Add/remove/reorder widgets (simple grid, no drag-drop yet) |
-| P1-FRONT-19 | Sidebar layout (main app layout) | `todo` | M | 1 | — | P1-FRONT-15 | Navigation, user menu, logout |
+| ID | Task | Status | Effort | Priority | Depends | Notes |
+|---|------|--------|--------|----------|---------|-------|
+| P1-DASH-03 | Recharts wrapper components | `todo` | M | 1 | — | BarChart, LineChart, PieChart, AreaChart, Table wrappers in components/charts/ |
+| P1-DASH-04 | Dashboard list page | `todo` | S | 1 | P1-CSV-04 | List dashboards, create new, delete, open in view/edit mode |
+| P1-DASH-05 | Dashboard canvas (react-grid-layout) | `todo` | L | 1 | P1-DASH-04 | Grid layout with drag/resize widgets, save layout, responsive breakpoints |
+| P1-DASH-06 | Widget creation flow | `todo` | M | 1 | P1-DASH-05, P1-AI-08 | Select measure/dimension → choose chart type → configure → add to grid |
+| P1-DASH-07 | Dashboard templates (Ventes, RH) | `todo` | S | 2 | P1-DASH-06 | Pre-built layouts: Ventes (CA/mois, top produits, YoY), RH (effectifs, turnover, anciennete) |
 
 ---
 
-### Sprint 5: Testing & Deployment (Week 13–16)
+### Sprint 6: Polish & Deploy (Week 13-16)
 
-#### Testing
-| ID | Task | Status | Effort | Priority | Owner | Depends | Notes |
-|---|------|--------|--------|----------|-------|---------|-------|
-| P1-TEST-01 | Backend integration tests | `todo` | M | 2 | — | P1-BACK-19 | Auth + connector + AI flow end-to-end |
-| P1-TEST-02 | Frontend component tests | `todo` | M | 2 | — | P1-FRONT-19 | Jest + React Testing Library |
-| P1-TEST-03 | E2E tests (Playwright) | `todo` | L | 2 | — | P1-TEST-02 | Login → create source → ask question → view dashboard |
-
-#### Deployment & Docs
-| ID | Task | Status | Effort | Priority | Owner | Depends | Notes |
-|---|------|--------|--------|----------|-------|---------|-------|
-| P1-INFRA-01 | Docker Compose setup (local dev) | `todo` | S | 1 | — | — | backend, frontend, postgres, nginx containers |
-| P1-INFRA-02 | Dockerfile optimization | `todo` | S | 2 | — | P1-INFRA-01 | Multi-stage builds, security best practices |
-| P1-INFRA-03 | CI/CD GitHub Actions | `todo` | M | 2 | — | P1-TEST-03 | Lint, test, build on PR; deploy to staging on merge |
-| P1-INFRA-04 | Production deployment (OVH VPS) | `todo` | L | 1 | — | P1-INFRA-03 | SSH deploy, environment variables, SSL |
-| P1-DOCS-01 | README.md (dev setup + usage) | `todo` | S | 2 | — | P1-INFRA-01 | Quick start guide, architecture diagram |
-| P1-DOCS-02 | API documentation (OpenAPI/Swagger) | `todo` | S | 2 | — | P1-BACK-19 | Auto-generated from FastAPI, /docs endpoint |
-| P1-DOCS-03 | Contributing guide (open source) | `todo` | S | 2 | — | P1-DOCS-01 | Dev setup, coding standards, PR process |
+| ID | Task | Status | Effort | Priority | Depends | Notes |
+|---|------|--------|--------|----------|---------|-------|
+| P1-UX-01 | Workspace switcher | `todo` | XS | 2 | P1-DASH-02 | Sidebar dropdown to switch workspaces |
+| P1-UX-02 | Onboarding flow (upload → model → explore) | `todo` | M | 2 | P1-DASH-06 | Guided wizard for first-time users |
+| P1-TEST-01 | Backend integration tests | `todo` | M | 2 | P1-DASH-01 | Auth + CSV + AI + Dashboard flow E2E |
+| P1-TEST-02 | Frontend component tests | `todo` | M | 2 | P1-DASH-06 | Jest + RTL for key components |
+| P1-INFRA-01 | Docker Compose setup (local dev) | `todo` | S | 1 | — | backend, frontend, postgres, nginx |
+| P1-INFRA-02 | CI/CD GitHub Actions | `todo` | M | 2 | P1-TEST-01 | Lint, test, build on PR |
+| P1-INFRA-03 | Production deployment (OVH VPS) | `todo` | L | 1 | P1-INFRA-02 | SSH deploy, SSL, env vars |
 
 ---
 
-## 🔗 Dependencies Map
+## Dependencies Map
 
 ```
-Auth Setup (P1-BACK-02, P1-FRONT-01)
-├── Multi-tenant core (P1-CORE-01)
-│   ├── Connector Service (P1-BACK-05)
-│   │   ├── PostgreSQL/MySQL (P1-BACK-06, 07)
-│   │   ├── CSV (P1-BACK-08)
-│   │   └── Data sources CRUD (P1-BACK-09)
-│   │       └── Frontend: Sources UI (P1-FRONT-05..09)
-│   │
-│   ├── Query Service (P1-BACK-10)
-│   │   └── Execution (P1-BACK-14)
-│   │       └── Frontend: Chart rendering (P1-FRONT-12..14)
-│   │
-│   └── AI Service (P1-BACK-11)
-│       ├── Text-to-SQL (P1-BACK-12)
-│       └── AI Endpoint (P1-BACK-13)
-│           └── Frontend: Chat (P1-FRONT-10..11)
+Auth (DONE) + Multi-tenant (DONE)
 │
-├── Dashboards (P1-BACK-16..19)
-│   └── Frontend: Dashboard Editor (P1-FRONT-16..18)
+├── Sprint 2: CSV Core
+│   ├── P1-CSV-01 → P1-CSV-02 → P1-CSV-03 (backend)
+│   └── P1-CSV-04 → P1-CSV-05 → P1-CSV-06 → P1-CSV-07 (frontend)
 │
-└── Testing (P1-TEST-01..03)
-    └── Deployment (P1-INFRA-01..04, P1-DOCS-01..03)
+├── Sprint 3: Semantic Model
+│   ├── P1-SEM-01 → P1-SEM-02 (backend, depends on P1-CSV-03)
+│   └── P1-SEM-03 → P1-SEM-04 + P1-SEM-05 (frontend, depends on P1-CSV-07)
+│
+├── Sprint 4: AI + SQL
+│   ├── P1-AI-01 → P1-AI-03 → P1-AI-04 (backend, P1-AI-03 depends on P1-SEM-02)
+│   ├── P1-AI-02 (backend, independent)
+│   └── P1-AI-05 → P1-AI-06 → P1-AI-08, P1-AI-07 (frontend)
+│
+├── Sprint 5: Dashboards
+│   ├── P1-DASH-01 + P1-DASH-02 (backend)
+│   └── P1-DASH-03 → P1-DASH-04 → P1-DASH-05 → P1-DASH-06 → P1-DASH-07 (frontend)
+│
+└── Sprint 6: Polish + Deploy
+    └── P1-UX-*, P1-TEST-*, P1-INFRA-*
 ```
 
 ---
 
-## 🎓 Learning Goals (for blog post later)
+## Architecture — Tech Stack MVP
 
-Each task should include:
-- 📖 **Pattern used** (e.g., "SQLAlchemy async session management")
-- 🧠 **Claude Code tricks** (e.g., "/epct workflow", "multi-tenant-guard skill")
-- 🎯 **Best practice** (e.g., "always filter by tenant_id")
-
----
-
-## 📝 Notes for Task Validation
-
-When `/datapilot-taskmaster validate <task-id>` is run:
-1. ✅ Check task status changed to `completed`
-2. 📝 Update BACKLOG.md with completion date
-3. 🔗 Link to GitHub issue/PR
-4. 📚 Extract learning notes for blog
-5. 🔄 Trigger updates to related `.claude` files (MEMORY.md, etc.)
-6. 📊 Recalculate completion rate
+| Component | Library | Rationale |
+|-----------|---------|-----------|
+| ERD visual editor | ReactFlow | React-native nodes/edges, drag & drop, custom TableNode |
+| Dashboard grid | react-grid-layout | Standard (Grafana, Kibana), resize + responsive |
+| SQL editor | CodeMirror 6 | 400kb (vs 5MB Monaco), SQL autocompletion, SSR-friendly |
+| CSV upload UI | react-dropzone | Lightweight, multi-file, progress events |
+| Charts | Recharts | Already planned, good React integration |
+| CSV query engine | DuckDB (in-process) | Native CSV/Parquet read, cross-file JOINs |
+| LLM abstraction | Custom adapter pattern | LLMProvider → ClaudeProvider / OpenAIProvider |
+| CSV storage | Filesystem local | /var/datapilot/uploads/{tenant_id}/{ds_id}/ — S3 in Phase 2 |
 
 ---
 
-## 🚀 How to Use This Backlog
+## Removed from MVP (deferred to Phase 2)
+
+| ID | Task | Reason |
+|---|------|--------|
+| P1-BACK-06 | PostgreSQL connector | CSV-first approach — DB connectors = Phase 2 |
+| P1-BACK-07 | MySQL connector | Same as above |
+| P1-FRONT-07 | PostgreSQL form | Same as above |
+| P1-FRONT-08 | MySQL form | Same as above |
+
+---
+
+## How to Use This Backlog
 
 ### Start a task
 ```bash
-/run-tasks P1-BACK-02
-# This will:
-# 1. Create a GitHub issue if not exists
-# 2. Create a feature branch
-# 3. Run EPCT workflow
-# 4. Create a PR when done
+/run-tasks P1-CSV-01
 ```
 
 ### Validate completion
 ```bash
-/datapilot-taskmaster validate P1-BACK-02
-# This will:
-# 1. Check PR merged
-# 2. Update BACKLOG.md
-# 3. Update MEMORY.md with learnings
-# 4. Recalculate progress
+/datapilot-taskmaster validate P1-CSV-01
 ```
 
 ### View project status
 ```bash
 /datapilot-taskmaster status
-# Shows: completion %, critical path, blockers
 ```
 
 ---
 
-## 📅 Timeline
-
-| Week | Sprint | Focus | Target |
-|------|--------|-------|--------|
-| 1–2 | #1 | Auth foundation | Backend auth + frontend login |
-| 3–4 | #2 | Data connectors | PostgreSQL, MySQL, CSV |
-| 5–8 | #3 | AI & query engine | Text-to-SQL, chart suggestions |
-| 9–12 | #4 | Dashboards | Full CRUD, basic editor |
-| 13–16 | #5 | Testing & deploy | E2E tests, OVH production |
-
-**Go-live target**: End of Week 16 (mid-April 2026)
-
----
-
-## 📌 Critical Path Tasks (cannot be parallelized)
-
-1. **P1-BACK-01** — Migrations setup
-2. **P1-BACK-02** → **P1-BACK-03** — Auth service + routes
-3. **P1-CORE-01** — Multi-tenant isolation
-4. **P1-BACK-05** — Connector service base
-5. **P1-BACK-10** — Query service
-6. **P1-BACK-11** → **P1-BACK-13** — AI service full stack
-7. **P1-BACK-19** — Dashboards
-8. **P1-INFRA-04** — Prod deployment
-
----
-
-**Last updated**: 2026-02-14 by Claude Code (after frontend auth sprint)
-**Next review**: After each sprint completion
+**Last updated**: 2026-02-14 by @architect (Sprint 2 backend completed, frontend CSV next)
+**Next milestone**: Sprint 2 — Frontend CSV (in progress) + Sprint 3 — Semantic Model

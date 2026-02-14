@@ -74,6 +74,14 @@ docker-compose exec backend alembic upgrade head
 docker-compose exec backend pytest tests/ -v
 ```
 
+## Documentation API obligatoire
+Après chaque feature backend qui crée ou modifie des endpoints API :
+- **Créer/mettre à jour** un fichier dans `docs/api/<domaine>.md`
+- Format : endpoint, méthode, curl d'exemple, réponse JSON type, codes d'erreur
+- Inclure un **Quick Test Flow** (register → login → utiliser l'endpoint)
+- Fichiers existants : `docs/api/data-sources.md`
+- Cette étape fait partie du workflow `/run-tasks` — ne pas considérer une tâche terminée sans la doc API
+
 ## Phase actuelle : Phase 1 — MVP
 Focus : text-to-SQL + connecteurs PostgreSQL/MySQL/CSV + dashboards basiques
 NE PAS implémenter encore : connecteurs Sage/Cegid, embedded analytics, marketplace
