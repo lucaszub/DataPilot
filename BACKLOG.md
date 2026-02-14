@@ -8,11 +8,11 @@
 
 | Metric | Value | Target |
 |--------|-------|--------|
-| Phase 1 Tasks | 35 | 100% |
-| Completed | 12 | 35 |
+| Phase 1 Tasks | 40 | 100% |
+| Completed | 12 | 40 |
 | In Progress | 0 | — |
 | Blocked | 0 | 0 |
-| Completion Rate | 34% | 100% |
+| Completion Rate | 30% | 100% |
 
 ---
 
@@ -87,52 +87,90 @@ Each task has:
 
 ---
 
-### Sprint 4: AI + SQL Editor (Week 7-9)
+### Sprint 4: SQL Explorer (Week 7-8)
+
+> **Spec complete**: voir `docs/specs/explorer-dashboard-spec.md`
+> **Decision**: SQL d'abord, Chat IA reporte apres dashboards
+
+#### Backend SQL Explorer
+| ID | Task | Status | Effort | Priority | Depends | Notes |
+|---|------|--------|--------|----------|---------|-------|
+| P1-SQL-01 | Query execution service (DuckDB) | `todo` | M | 1 | P1-SEM-02 | Execute SQL on DuckDB semantic model, return results as JSON, sanitize user SQL, timeout 30s, LIMIT force |
+| P1-SQL-02 | SavedQuery CRUD routes | `todo` | S | 1 | P1-CORE-01 | Table saved_queries (id, tenant_id, workspace_id, name, sql_text, chart_type, created_at, updated_at) |
+
+#### Frontend SQL Explorer
+| ID | Task | Status | Effort | Priority | Depends | Notes |
+|---|------|--------|--------|----------|---------|-------|
+| P1-SQL-03 | SQL editor (CodeMirror 6) | `todo` | M | 1 | P1-SEM-05 | CodeMirror 6 + @codemirror/lang-sql, autocompletion from semantic schema (table/column names), Ctrl+Enter execute |
+| P1-SQL-04 | Query result table (TanStack Table) | `todo` | M | 1 | P1-SQL-03 | Headless TanStack Table, pagination, tri par colonne, colonnes redimensionnables |
+| P1-SQL-05 | SavedQuery list + management | `todo` | S | 1 | P1-SQL-02 | List saved queries, rename, delete, load into editor |
+
+---
+
+### Sprint 5: Dashboard Builder (Week 9-11)
+
+> **Decision**: Explorer integre dans le dashboard builder (pas de page separee)
+
+#### Backend Dashboards
+| ID | Task | Status | Effort | Priority | Depends | Notes |
+|---|------|--------|--------|----------|---------|-------|
+| P1-DASH-01 | Dashboards + Widgets CRUD routes | `todo` | M | 1 | P1-CORE-01 | Dashboard: name, layout_json, workspace_id, theme. Widget: saved_query_id, chart_type, position, size, filter_config |
+| P1-DASH-02 | Workspaces CRUD routes | `todo` | S | 1 | P1-CORE-01 | Create/list/update/delete workspaces |
+
+#### Frontend Dashboard Editor
+| ID | Task | Status | Effort | Priority | Depends | Notes |
+|---|------|--------|--------|----------|---------|-------|
+| P1-DASH-03 | Recharts wrapper components (5 types) | `todo` | M | 1 | — | KPI Card, BarChart, LineChart, PieChart/Donut, Table (TanStack). In components/charts/ |
+| P1-DASH-04 | Dashboard list page | `todo` | S | 1 | P1-CSV-04 | List dashboards, create new, delete, open in view/edit mode |
+| P1-DASH-05 | Dashboard canvas (react-grid-layout) | `todo` | L | 1 | P1-DASH-04 | 12-col grid, drag/resize widgets, snap-to-grid, 200px row height, 16px gap, save layout |
+| P1-DASH-06 | Explorer panel integre (widget creation) | `todo` | M | 1 | P1-DASH-05, P1-SQL-04 | Clic "+" → panneau lateral avec SQL editor → choisir chart type → ajouter au dashboard. Ou selectionner SavedQuery |
+| P1-DASH-07 | Filtres globaux configurables | `todo` | M | 1 | P1-DASH-06 | Barre de filtres en haut, l'utilisateur configure quel widget est affecte par quel filtre |
+| P1-DASH-08 | Palettes de couleurs (4 themes) | `todo` | S | 2 | P1-DASH-03 | Classique (bleu/gris), Moderne (noir/accent), Colore (multi-vif), Corporate (marine/or). Couleurs charts uniquement |
+
+---
+
+### Sprint 6: Spreadsheet Mode (Week 12-13)
+
+> **Decision**: TanStack Table + toggle SQL/Sheet dans l'Explorer
+
+#### Frontend Spreadsheet
+| ID | Task | Status | Effort | Priority | Depends | Notes |
+|---|------|--------|--------|----------|---------|-------|
+| P1-SHEET-01 | Toggle SQL/Sheet dans le panneau Explorer | `todo` | S | 1 | P1-DASH-06 | Deux onglets: SQL (CodeMirror) et Sheet (tableur). Meme source semantic layer |
+| P1-SHEET-02 | Vue tableur (TanStack Table avance) | `todo` | M | 1 | P1-SHEET-01 | Colonnes redimensionnables, scroll horizontal, tri, filtres par colonne (dropdown/range/texte) |
+| P1-SHEET-03 | Agregations visuelles | `todo` | S | 1 | P1-SHEET-02 | Footer row: SUM, AVG, COUNT, MIN, MAX par colonne (clic pour choisir) |
+| P1-SHEET-04 | Colonnes calculees | `todo` | M | 2 | P1-SHEET-02 | Ajouter une colonne avec formule referençant d'autres colonnes |
+| P1-SHEET-05 | Export CSV du resultat | `todo` | XS | 2 | P1-SHEET-02 | Telecharger le tableau filtre/trie en CSV |
+
+---
+
+### Sprint 7: Chat IA (Week 14-16)
+
+> **Decision**: Chat IA apres que le semantic model + explorer + dashboards soient solides
 
 #### Backend AI Service
 | ID | Task | Status | Effort | Priority | Depends | Notes |
 |---|------|--------|--------|----------|---------|-------|
 | P1-AI-01 | LLM Provider abstraction + Claude adapter | `todo` | M | 1 | — | Abstract LLMProvider class, ClaudeProvider, OpenAIProvider. Factory pattern based on api_key config |
 | P1-AI-02 | API Keys table + CRUD routes | `todo` | S | 1 | P1-CORE-01 | New table api_keys (id, tenant_id, provider, encrypted_key, model_id, is_active). Fernet encryption |
-| P1-AI-03 | /ai/query endpoint (text-to-SQL) | `todo` | M | 1 | P1-AI-01, P1-SEM-02 | POST {question, workspace_id} → {sql, results, chart_suggestion, explanation}. Uses semantic context |
-| P1-AI-04 | Query execution service | `todo` | M | 1 | P1-SEM-02 | Execute SQL on DuckDB semantic model, return DataFrame as JSON, sanitize user SQL |
+| P1-AI-03 | /ai/query endpoint (NL → SemanticQuery → SQL) | `todo` | M | 1 | P1-AI-01, P1-SEM-02 | POST {question, workspace_id} → {sql, results, chart_suggestion, explanation}. Uses semantic context |
 
-#### Frontend AI & SQL
+#### Frontend AI Chat
 | ID | Task | Status | Effort | Priority | Depends | Notes |
 |---|------|--------|--------|----------|---------|-------|
-| P1-AI-05 | API Keys settings page | `todo` | S | 1 | P1-CSV-04 | Multi-provider: select provider (Claude/OpenAI), paste key, select model, validate, toggle active |
-| P1-AI-06 | Chat/Explore interface | `todo` | M | 1 | P1-AI-05 | Question input, send button, loading state, AI response display (SQL + explanation) |
-| P1-AI-07 | SQL editor (CodeMirror) | `todo` | M | 2 | P1-SEM-05 | CodeMirror 6 + @codemirror/lang-sql, autocompletion from semantic schema (table/column names) |
-| P1-AI-08 | Query result display (table + chart) | `todo` | M | 1 | P1-AI-06 | Data table with pagination, auto chart suggestion rendering, toggle table/chart view |
+| P1-AI-04 | API Keys settings page | `todo` | S | 1 | P1-CSV-04 | Multi-provider: select provider (Claude/OpenAI), paste key, select model, validate, toggle active |
+| P1-AI-05 | Chat interface | `todo` | M | 1 | P1-AI-04 | Question input en francais, loading state, AI response (SQL + explication + chart suggestion) |
+| P1-AI-06 | Ajouter resultat chat comme widget | `todo` | S | 1 | P1-AI-05, P1-DASH-06 | Bouton "Ajouter au dashboard" depuis le resultat du chat |
 
 ---
 
-### Sprint 5: Dashboard Builder (Week 10-12)
-
-#### Backend Dashboards
-| ID | Task | Status | Effort | Priority | Depends | Notes |
-|---|------|--------|--------|----------|---------|-------|
-| P1-DASH-01 | Dashboards + Widgets CRUD routes | `todo` | M | 1 | P1-CORE-01 | Dashboard: name, layout_json, workspace_id. Widget: query_json, chart_type, position, size |
-| P1-DASH-02 | Workspaces CRUD routes | `todo` | S | 1 | P1-CORE-01 | Create/list/update/delete workspaces |
-
-#### Frontend Dashboard Editor
-| ID | Task | Status | Effort | Priority | Depends | Notes |
-|---|------|--------|--------|----------|---------|-------|
-| P1-DASH-03 | Recharts wrapper components | `todo` | M | 1 | — | BarChart, LineChart, PieChart, AreaChart, Table wrappers in components/charts/ |
-| P1-DASH-04 | Dashboard list page | `todo` | S | 1 | P1-CSV-04 | List dashboards, create new, delete, open in view/edit mode |
-| P1-DASH-05 | Dashboard canvas (react-grid-layout) | `todo` | L | 1 | P1-DASH-04 | Grid layout with drag/resize widgets, save layout, responsive breakpoints |
-| P1-DASH-06 | Widget creation flow | `todo` | M | 1 | P1-DASH-05, P1-AI-08 | Select measure/dimension → choose chart type → configure → add to grid |
-| P1-DASH-07 | Dashboard templates (Ventes, RH) | `todo` | S | 2 | P1-DASH-06 | Pre-built layouts: Ventes (CA/mois, top produits, YoY), RH (effectifs, turnover, anciennete) |
-
----
-
-### Sprint 6: Polish & Deploy (Week 13-16)
+### Sprint 8: Polish & Deploy (Week 17-18)
 
 | ID | Task | Status | Effort | Priority | Depends | Notes |
 |---|------|--------|--------|----------|---------|-------|
 | P1-UX-01 | Workspace switcher | `todo` | XS | 2 | P1-DASH-02 | Sidebar dropdown to switch workspaces |
 | P1-UX-02 | Onboarding flow (upload → model → explore) | `todo` | M | 2 | P1-DASH-06 | Guided wizard for first-time users |
-| P1-TEST-01 | Backend integration tests | `todo` | M | 2 | P1-DASH-01 | Auth + CSV + AI + Dashboard flow E2E |
+| P1-TEST-01 | Backend integration tests | `todo` | M | 2 | P1-DASH-01 | Auth + CSV + SQL + Dashboard flow E2E |
 | P1-TEST-02 | Frontend component tests | `todo` | M | 2 | P1-DASH-06 | Jest + RTL for key components |
 | P1-INFRA-01 | Docker Compose setup (local dev) | `todo` | S | 1 | — | backend, frontend, postgres, nginx |
 | P1-INFRA-02 | CI/CD GitHub Actions | `todo` | M | 2 | P1-TEST-01 | Lint, test, build on PR |
@@ -146,23 +184,31 @@ Each task has:
 Auth (DONE) + Multi-tenant (DONE)
 │
 ├── Sprint 2: CSV Core
-│   ├── P1-CSV-01 → P1-CSV-02 → P1-CSV-03 (backend)
+│   ├── P1-CSV-01 → P1-CSV-02 → P1-CSV-03 (backend DONE)
 │   └── P1-CSV-04 → P1-CSV-05 → P1-CSV-06 → P1-CSV-07 (frontend)
 │
 ├── Sprint 3: Semantic Model
 │   ├── P1-SEM-01 → P1-SEM-02 (backend, depends on P1-CSV-03)
 │   └── P1-SEM-03 → P1-SEM-04 + P1-SEM-05 (frontend, depends on P1-CSV-07)
 │
-├── Sprint 4: AI + SQL
-│   ├── P1-AI-01 → P1-AI-03 → P1-AI-04 (backend, P1-AI-03 depends on P1-SEM-02)
-│   ├── P1-AI-02 (backend, independent)
-│   └── P1-AI-05 → P1-AI-06 → P1-AI-08, P1-AI-07 (frontend)
+├── Sprint 4: SQL Explorer (NO AI YET)
+│   ├── P1-SQL-01 (backend, depends on P1-SEM-02)
+│   ├── P1-SQL-02 (backend, independent)
+│   └── P1-SQL-03 → P1-SQL-04 → P1-SQL-05 (frontend)
 │
-├── Sprint 5: Dashboards
+├── Sprint 5: Dashboard Builder (Explorer integre)
 │   ├── P1-DASH-01 + P1-DASH-02 (backend)
-│   └── P1-DASH-03 → P1-DASH-04 → P1-DASH-05 → P1-DASH-06 → P1-DASH-07 (frontend)
+│   └── P1-DASH-03 → P1-DASH-04 → P1-DASH-05 → P1-DASH-06 → P1-DASH-07 → P1-DASH-08
 │
-└── Sprint 6: Polish + Deploy
+├── Sprint 6: Spreadsheet Mode
+│   └── P1-SHEET-01 → P1-SHEET-02 → P1-SHEET-03 + P1-SHEET-04 + P1-SHEET-05
+│
+├── Sprint 7: Chat IA (after everything else is solid)
+│   ├── P1-AI-01 → P1-AI-03 (backend)
+│   ├── P1-AI-02 (backend, independent)
+│   └── P1-AI-04 → P1-AI-05 → P1-AI-06 (frontend)
+│
+└── Sprint 8: Polish + Deploy
     └── P1-UX-*, P1-TEST-*, P1-INFRA-*
 ```
 
@@ -175,8 +221,9 @@ Auth (DONE) + Multi-tenant (DONE)
 | ERD visual editor | ReactFlow | React-native nodes/edges, drag & drop, custom TableNode |
 | Dashboard grid | react-grid-layout | Standard (Grafana, Kibana), resize + responsive |
 | SQL editor | CodeMirror 6 | 400kb (vs 5MB Monaco), SQL autocompletion, SSR-friendly |
+| Data tables | TanStack Table | Headless, MIT, ~50kb, used for SQL results + spreadsheet mode |
 | CSV upload UI | react-dropzone | Lightweight, multi-file, progress events |
-| Charts | Recharts | Already planned, good React integration |
+| Charts | Recharts | 5 types MVP: KPI Card, Bar, Line, Pie/Donut, Table |
 | CSV query engine | DuckDB (in-process) | Native CSV/Parquet read, cross-file JOINs |
 | LLM abstraction | Custom adapter pattern | LLMProvider → ClaudeProvider / OpenAIProvider |
 | CSV storage | Filesystem local | /var/datapilot/uploads/{tenant_id}/{ds_id}/ — S3 in Phase 2 |
@@ -191,6 +238,10 @@ Auth (DONE) + Multi-tenant (DONE)
 | P1-BACK-07 | MySQL connector | Same as above |
 | P1-FRONT-07 | PostgreSQL form | Same as above |
 | P1-FRONT-08 | MySQL form | Same as above |
+| — | Dashboard themes (fond, bordures, typo) | Phase 2 — MVP = palettes de couleurs uniquement |
+| — | Mode plein ecran dashboard | V1.1 |
+| — | Export PDF/PNG dashboard | V1.2 |
+| — | Partage par lien public | V1.2 |
 
 ---
 
@@ -213,5 +264,6 @@ Auth (DONE) + Multi-tenant (DONE)
 
 ---
 
-**Last updated**: 2026-02-14 by @architect (Sprint 2 backend completed, frontend CSV next)
-**Next milestone**: Sprint 2 — Frontend CSV (in progress) + Sprint 3 — Semantic Model
+**Last updated**: 2026-02-14 by @architect (Backlog reorganized: SQL → Dashboard → Sheet → AI)
+**Next milestone**: Sprint 2 — Frontend CSV + Sprint 3 — Semantic Model
+**Spec reference**: `docs/specs/explorer-dashboard-spec.md`

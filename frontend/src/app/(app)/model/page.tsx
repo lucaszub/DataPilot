@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect, useMemo } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -18,7 +18,7 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Save, Database, Loader2 } from 'lucide-react';
+import { Save, Database, Loader2, Search, X, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 import { TableNode, type TableNodeData } from '@/components/features/TableNode';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,9 +34,11 @@ function ModelCanvas() {
   const [isLoadingSources, setIsLoadingSources] = useState(true);
   const [modelName, setModelName] = useState('Mon modele');
   const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [currentLayerId, setCurrentLayerId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch or create default workspace, then load existing semantic layer
   useEffect(() => {
@@ -165,14 +167,28 @@ function ModelCanvas() {
     }
   }, [reactFlowInstance, setNodes]);
 
+  // Filter data sources by search query
+  const filteredDataSources = useMemo(() => {
+    if (!searchQuery.trim()) return dataSources;
+    const query = searchQuery.toLowerCase();
+    return dataSources.filter(source =>
+      source.name.toLowerCase().includes(query)
+    );
+  }, [dataSources, searchQuery]);
+
   const handleSave = useCallback(async () => {
     if (!workspaceId) {
+      setSaveStatus('error');
       setSaveMessage('Workspace non disponible');
-      setTimeout(() => setSaveMessage(null), 3000);
+      setTimeout(() => {
+        setSaveStatus('idle');
+        setSaveMessage(null);
+      }, 3000);
       return;
     }
 
     setIsSaving(true);
+    setSaveStatus('saving');
     setSaveMessage(null);
 
     try {
@@ -210,12 +226,20 @@ function ModelCanvas() {
         setCurrentLayerId(created.id);
       }
 
+      setSaveStatus('success');
       setSaveMessage('Modele sauvegarde avec succes');
-      setTimeout(() => setSaveMessage(null), 3000);
+      setTimeout(() => {
+        setSaveStatus('idle');
+        setSaveMessage(null);
+      }, 3000);
     } catch (error) {
       console.error('Failed to save semantic layer:', error);
+      setSaveStatus('error');
       setSaveMessage('Erreur lors de la sauvegarde');
-      setTimeout(() => setSaveMessage(null), 3000);
+      setTimeout(() => {
+        setSaveStatus('idle');
+        setSaveMessage(null);
+      }, 3000);
     } finally {
       setIsSaving(false);
     }
@@ -224,27 +248,51 @@ function ModelCanvas() {
   return (
     <div className="flex h-[calc(100vh-4rem)]">
       {/* Left panel: data source list */}
-      <div className="w-64 border-r bg-white flex flex-col">
-        <div className="p-4 border-b border-gray-100">
-          <h3 className="font-semibold text-sm text-gray-500 uppercase mb-3">
-            Sources disponibles
+      <div className="w-72 border-r bg-gray-50 flex flex-col">
+        <div className="p-4 border-b bg-white">
+          <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-3">
+            Sources de donnees
           </h3>
+
+          {/* Search input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Rechercher..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-9"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label="Effacer la recherche"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {isLoadingSources ? (
-            <div className="flex items-center justify-center py-8">
+            <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
             </div>
-          ) : dataSources.length === 0 ? (
-            <div className="text-center py-8">
-              <Database className="h-8 w-8 mx-auto text-gray-300 mb-2" />
-              <p className="text-sm text-gray-500">
-                Aucune source disponible
+          ) : filteredDataSources.length === 0 ? (
+            <div className="text-center py-12">
+              <Database className="h-10 w-10 mx-auto text-gray-300 mb-3" />
+              <p className="text-sm font-medium text-gray-900 mb-1">
+                {searchQuery ? 'Aucun resultat' : 'Aucune source'}
+              </p>
+              <p className="text-xs text-gray-500">
+                {searchQuery ? 'Essayez un autre terme' : 'Importez des donnees pour commencer'}
               </p>
             </div>
           ) : (
-            dataSources.map((source) => (
+            filteredDataSources.map((source) => (
               <div
                 key={source.id}
                 draggable
@@ -252,13 +300,13 @@ function ModelCanvas() {
                   event.dataTransfer.setData('application/datapilot-source', source.id);
                   event.dataTransfer.effectAllowed = 'move';
                 }}
-                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-white hover:border-indigo-300 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all"
+                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-white hover:border-indigo-400 hover:shadow-md cursor-grab active:cursor-grabbing transition-all"
               >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
-                  <Database className="h-4 w-4 text-indigo-600" />
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-sm">
+                  <Database className="h-4 w-4 text-white" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-gray-900">
+                  <p className="truncate text-sm font-semibold text-gray-900">
                     {source.name}
                   </p>
                   <p className="text-xs text-gray-500">
@@ -272,27 +320,50 @@ function ModelCanvas() {
       </div>
 
       {/* ReactFlow canvas */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col bg-white">
         {/* Toolbar */}
-        <div className="flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-4 py-3">
-          <Input
-            type="text"
-            value={modelName}
-            onChange={(e) => setModelName(e.target.value)}
-            className="max-w-xs"
-            placeholder="Nom du modele"
-          />
+        <div className="flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-6 py-3 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-sm">
+              <Sparkles className="h-5 w-5 text-white" />
+            </div>
+            <Input
+              type="text"
+              value={modelName}
+              onChange={(e) => setModelName(e.target.value)}
+              className="max-w-xs font-semibold"
+              placeholder="Nom du modele"
+            />
+          </div>
 
           <div className="flex items-center gap-3">
-            {saveMessage && (
-              <span className={`text-sm ${saveMessage.includes('succes') ? 'text-green-600' : 'text-red-600'}`}>
-                {saveMessage}
-              </span>
+            {saveStatus !== 'idle' && (
+              <div className="flex items-center gap-2">
+                {saveStatus === 'saving' && (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                    <span className="text-sm text-gray-600">Sauvegarde...</span>
+                  </>
+                )}
+                {saveStatus === 'success' && (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <span className="text-sm text-green-600">{saveMessage}</span>
+                  </>
+                )}
+                {saveStatus === 'error' && (
+                  <>
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                    <span className="text-sm text-red-600">{saveMessage}</span>
+                  </>
+                )}
+              </div>
             )}
             <Button
               onClick={handleSave}
               disabled={isSaving || nodes.length === 0}
               aria-label="Sauvegarder le modele"
+              size="default"
             >
               {isSaving ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -306,10 +377,32 @@ function ModelCanvas() {
 
         {/* Canvas */}
         <div
-          className="flex-1"
+          className="flex-1 relative"
           onDragOver={onDragOver}
           onDrop={onDrop}
         >
+          {/* Empty state overlay */}
+          {nodes.length === 0 && !isLoadingSources && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <div className="text-center max-w-md">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-100 mb-4">
+                  <Database className="h-8 w-8 text-indigo-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Creez votre modele de donnees
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Glissez-deposez des sources depuis le panneau de gauche pour commencer.
+                  Connectez les colonnes pour definir les relations entre vos tables.
+                </p>
+                <div className="inline-flex items-center gap-2 text-xs text-gray-500 bg-gray-100 px-3 py-2 rounded-lg">
+                  <span className="font-semibold">Astuce:</span>
+                  Cliquez sur les badges (D/M/—) pour changer le role des colonnes
+                </div>
+              </div>
+            </div>
+          )}
+
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -320,12 +413,12 @@ function ModelCanvas() {
             fitView
             className="bg-gray-50"
           >
-            <Controls />
+            <Controls className="bg-white border border-gray-200 rounded-lg shadow-lg" />
             <MiniMap
               nodeColor={(node) => '#4F46E5'}
-              className="bg-white border border-gray-200 rounded-lg"
+              className="bg-white border border-gray-200 rounded-lg shadow-lg"
             />
-            <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+            <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#e5e7eb" />
           </ReactFlow>
         </div>
       </div>

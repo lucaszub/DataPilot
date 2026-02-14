@@ -118,9 +118,9 @@ class SemanticQueryBuilder:
             raise ValueError("Semantic layer has no table nodes defined")
 
         for node in nodes:
-            data = node.get("data", {})
-            source_id = data.get("source_id")
-            source_name = data.get("source_name")
+            # Support both flat format (data_source_id) and nested (data.source_id)
+            source_id = node.get("data_source_id") or node.get("data", {}).get("source_id")
+            source_name = node.get("data_source_name") or node.get("data", {}).get("source_name")
 
             if not source_id or not source_name:
                 continue

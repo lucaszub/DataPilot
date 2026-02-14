@@ -57,7 +57,7 @@ export function QueryResultTable({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12 text-gray-500">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent mr-3" />
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-teal-600 border-t-transparent mr-3" />
         Execution en cours...
       </div>
     );
@@ -73,7 +73,7 @@ export function QueryResultTable({
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
+      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
         <table className="w-full text-sm" aria-label="Resultats de la requete">
           <thead className="bg-gray-50 border-b border-gray-200">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -82,20 +82,20 @@ export function QueryResultTable({
                   <th
                     key={header.id}
                     scope="col"
-                    className="px-4 py-3 text-left font-semibold text-gray-700 whitespace-nowrap select-none"
+                    className="px-4 py-2.5 text-left font-semibold text-gray-700 whitespace-nowrap select-none text-xs uppercase tracking-wider"
                   >
                     {header.isPlaceholder ? null : (
                       <button
                         type="button"
-                        className="flex items-center gap-1.5 hover:text-indigo-600 transition-colors"
+                        className="flex items-center gap-1.5 hover:text-teal-600 transition-colors"
                         onClick={header.column.getToggleSortingHandler()}
                         aria-label={`Trier par ${flexRender(header.column.columnDef.header, header.getContext())}`}
                       >
                         {flexRender(header.column.columnDef.header, header.getContext())}
                         {header.column.getIsSorted() === "asc" ? (
-                          <ArrowUp className="h-3.5 w-3.5 text-indigo-600" />
+                          <ArrowUp className="h-3.5 w-3.5 text-teal-600" />
                         ) : header.column.getIsSorted() === "desc" ? (
-                          <ArrowDown className="h-3.5 w-3.5 text-indigo-600" />
+                          <ArrowDown className="h-3.5 w-3.5 text-teal-600" />
                         ) : (
                           <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
                         )}
@@ -118,11 +118,11 @@ export function QueryResultTable({
               </tr>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={row.id} className="hover:bg-teal-50 transition-colors">
                   {row.getVisibleCells().map((cell) => (
                     <td
                       key={cell.id}
-                      className="px-4 py-3 text-gray-700 max-w-xs truncate"
+                      className="px-4 py-2.5 text-gray-700 max-w-xs truncate font-mono text-xs"
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>

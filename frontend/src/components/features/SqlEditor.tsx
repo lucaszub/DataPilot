@@ -27,6 +27,11 @@ const lightTheme = EditorView.theme({
     backgroundColor: "white",
     fontSize: "14px",
     fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
+    height: "100%",
+    flex: "1",
+  },
+  ".cm-scroller": {
+    overflow: "auto",
   },
   ".cm-content": {
     caretColor: "#4f46e5",
@@ -177,7 +182,7 @@ export function SqlEditor({
   return (
     <div
       ref={editorRef}
-      className="overflow-hidden rounded-lg border border-gray-200 bg-white focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500 transition-shadow"
+      className="overflow-hidden rounded-lg border border-gray-200 bg-white focus-within:ring-2 focus-within:ring-teal-500 focus-within:border-teal-500 transition-shadow h-full"
       aria-label="SQL editor"
     />
   );
