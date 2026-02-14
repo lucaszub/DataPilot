@@ -1,4 +1,4 @@
-je # DataPilot — Contexte Projet pour Claude Code
+# DataPilot — Contexte Projet pour Claude Code
 
 ## Qu'est-ce que DataPilot ?
 Plateforme SaaS de Business Intelligence avec IA conversationnelle,
@@ -74,13 +74,35 @@ docker-compose exec backend alembic upgrade head
 docker-compose exec backend pytest tests/ -v
 ```
 
-## Documentation API obligatoire
-Après chaque feature backend qui crée ou modifie des endpoints API :
-- **Créer/mettre à jour** un fichier dans `docs/api/<domaine>.md`
-- Format : endpoint, méthode, curl d'exemple, réponse JSON type, codes d'erreur
-- Inclure un **Quick Test Flow** (register → login → utiliser l'endpoint)
-- Fichiers existants : `docs/api/data-sources.md`
-- Cette étape fait partie du workflow `/run-tasks` — ne pas considérer une tâche terminée sans la doc API
+## Pratiques de documentation
+
+**Règle : chaque tâche terminée = doc à jour.** Une tâche n'est pas terminée tant que la doc concernée n'a pas été mise à jour.
+
+### Principes
+- **Concis mais précis** : aller droit au but, pas de prose inutile. Un dev doit comprendre en 30 secondes.
+- **Ne documenter que ce qui existe** : pas de spéculations, pas de TODO vagues. Si c'est pas implémenté, c'est pas dans la doc.
+- **Un seul endroit par sujet** : éviter les doublons entre fichiers. Si l'info existe déjà, mettre à jour plutôt que réécrire ailleurs.
+
+### Quoi mettre à jour et quand
+
+| Changement | Fichier(s) à mettre à jour |
+|---|---|
+| Nouvel endpoint ou modification API | `docs/api/<domaine>.md` — endpoint, méthode, curl exemple, réponse JSON, codes erreur |
+| Nouveau modèle ou migration | `CLAUDE.md` § Modèle de données + `BACKLOG.md` (marquer la tâche completed) |
+| Nouveau composant frontend ou page | `CLAUDE.md` § Frontend — Structure & Patterns (si pattern nouveau) |
+| Décision d'architecture | `CLAUDE.md` section concernée (stack, sécurité, conventions) |
+| Tâche terminée (toute tâche) | `BACKLOG.md` — passer le status à `completed` |
+
+### Format docs API (`docs/api/`)
+- Endpoint, méthode HTTP, description en une ligne
+- Curl d'exemple avec réponse JSON type
+- Codes d'erreur possibles
+- Quick Test Flow (register → login → utiliser l'endpoint)
+
+### Ce qu'il ne faut PAS faire
+- Pas de paragraphes d'explication quand une liste suffit
+- Pas de doc sur du code évident (un GET /items qui retourne des items n'a pas besoin de 10 lignes)
+- Pas de duplication : si `CLAUDE.md` décrit déjà l'archi, ne pas la réécrire dans un autre fichier
 
 ## Phase actuelle : Phase 1 — MVP
 Focus : text-to-SQL + connecteurs PostgreSQL/MySQL/CSV + dashboards basiques
