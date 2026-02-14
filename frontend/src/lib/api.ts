@@ -69,6 +69,47 @@ export interface DataSourcePreview {
   total_pages: number;
 }
 
+// --- Semantic Layer Types ---
+
+export interface SemanticLayerNode {
+  id: string;
+  data_source_id: string;
+  data_source_name: string;
+  position: { x: number; y: number };
+  columns: Array<{ name: string; type: string; role: 'dimension' | 'measure' | 'ignore' }>;
+}
+
+export interface SemanticLayerEdge {
+  id: string;
+  source_node: string;
+  source_column: string;
+  target_node: string;
+  target_column: string;
+  join_type: 'LEFT' | 'INNER';
+}
+
+export interface SemanticLayerDefinitions {
+  nodes: SemanticLayerNode[];
+  edges: SemanticLayerEdge[];
+}
+
+export interface SemanticLayerDetail {
+  id: string;
+  tenant_id: string;
+  workspace_id: string;
+  name: string;
+  definitions_json: SemanticLayerDefinitions | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface SemanticLayerListItem {
+  id: string;
+  workspace_id: string;
+  name: string;
+  created_at: string;
+}
+
 // --- Concurrent refresh guard ---
 
 let isRefreshing = false;
@@ -298,9 +339,40 @@ const dataSourcesApi = {
   },
 };
 
+// --- Semantic Layers API ---
+
+const semanticLayersApi = {
+  list(workspaceId: string): Promise<SemanticLayerListItem[]> {
+    return request<SemanticLayerListItem[]>(`/api/v1/semantic-layers/?workspace_id=${workspaceId}`);
+  },
+
+  getById(id: string): Promise<SemanticLayerDetail> {
+    return request<SemanticLayerDetail>(`/api/v1/semantic-layers/${id}`);
+  },
+
+  create(data: { workspace_id: string; name: string; definitions_json?: SemanticLayerDefinitions }): Promise<SemanticLayerDetail> {
+    return request<SemanticLayerDetail>('/api/v1/semantic-layers/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  update(id: string, data: { name?: string; definitions_json?: SemanticLayerDefinitions }): Promise<SemanticLayerDetail> {
+    return request<SemanticLayerDetail>(`/api/v1/semantic-layers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  delete(id: string): Promise<void> {
+    return request<void>(`/api/v1/semantic-layers/${id}`, { method: 'DELETE' });
+  },
+};
+
 export const api = {
   auth: authApi,
   dataSources: dataSourcesApi,
+  semanticLayers: semanticLayersApi,
 };
 
 // Keep backward-compatible export for any existing usage
