@@ -71,17 +71,17 @@ export default function LoginPage() {
             />
           </svg>
         </div>
-        <span className="text-lg font-bold text-white">DataPilot</span>
+        <span className="text-lg font-bold text-gray-900">DataPilot</span>
       </div>
 
       {/* Header */}
       <div className="space-y-1">
-        <h2 className="text-2xl font-bold text-white">Connexion</h2>
-        <p className="text-sm text-gray-400">
+        <h2 className="text-2xl font-bold text-gray-900">Connexion</h2>
+        <p className="text-sm text-gray-500">
           Pas encore de compte ?{" "}
           <Link
             href="/register"
-            className="font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
+            className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
           >
             Creer un compte
           </Link>
@@ -110,7 +110,7 @@ export default function LoginPage() {
             {...register("email")}
           />
           {errors.email && (
-            <p id="email-error" className="text-xs text-red-400" role="alert">
+            <p id="email-error" className="text-xs text-red-500" role="alert">
               {errors.email.message}
             </p>
           )}
@@ -131,7 +131,7 @@ export default function LoginPage() {
           {errors.password && (
             <p
               id="password-error"
-              className="text-xs text-red-400"
+              className="text-xs text-red-500"
               role="alert"
             >
               {errors.password.message}

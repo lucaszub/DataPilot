@@ -13,8 +13,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" className="dark">
-      <body className="bg-gray-950 text-gray-100">
+    <html lang="fr">
+      <body className="bg-gray-50 text-gray-900">
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

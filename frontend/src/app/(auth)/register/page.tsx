@@ -81,17 +81,17 @@ export default function RegisterPage() {
             />
           </svg>
         </div>
-        <span className="text-lg font-bold text-white">DataPilot</span>
+        <span className="text-lg font-bold text-gray-900">DataPilot</span>
       </div>
 
       {/* Header */}
       <div className="space-y-1">
-        <h2 className="text-2xl font-bold text-white">Creer un compte</h2>
-        <p className="text-sm text-gray-400">
+        <h2 className="text-2xl font-bold text-gray-900">Creer un compte</h2>
+        <p className="text-sm text-gray-500">
           Deja un compte ?{" "}
           <Link
             href="/login"
-            className="font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
+            className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
           >
             Se connecter
           </Link>
@@ -120,7 +120,7 @@ export default function RegisterPage() {
             {...register("email")}
           />
           {errors.email && (
-            <p id="email-error" className="text-xs text-red-400" role="alert">
+            <p id="email-error" className="text-xs text-red-500" role="alert">
               {errors.email.message}
             </p>
           )}
@@ -138,13 +138,13 @@ export default function RegisterPage() {
             aria-describedby="password-hint password-error"
             {...register("password")}
           />
-          <p id="password-hint" className="text-xs text-gray-500">
+          <p id="password-hint" className="text-xs text-gray-400">
             8 caracteres minimum, une majuscule, un chiffre
           </p>
           {errors.password && (
             <p
               id="password-error"
-              className="text-xs text-red-400"
+              className="text-xs text-red-500"
               role="alert"
             >
               {errors.password.message}
@@ -169,7 +169,7 @@ export default function RegisterPage() {
           {errors.confirmPassword && (
             <p
               id="confirm-password-error"
-              className="text-xs text-red-400"
+              className="text-xs text-red-500"
               role="alert"
             >
               {errors.confirmPassword.message}
@@ -215,7 +215,7 @@ export default function RegisterPage() {
       </form>
 
       {/* Footer */}
-      <p className="text-center text-xs text-gray-600">
+      <p className="text-center text-xs text-gray-400">
         En creant un compte, vous acceptez nos{" "}
         <span className="text-gray-500">Conditions d&apos;utilisation</span>
       </p>

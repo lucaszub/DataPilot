@@ -40,6 +40,35 @@ export interface UserResponse {
   created_at: string;
 }
 
+// --- Data Source Types ---
+
+export interface DataSourceListItem {
+  id: string;
+  type: string;
+  name: string;
+  row_count: number | null;
+  column_count: number | null;
+  created_at: string;
+}
+
+export interface DataSourceDetail extends DataSourceListItem {
+  tenant_id: string;
+  schema_cache: {
+    columns: Array<{ name: string; type: string }>;
+    row_count: number;
+    sample_rows: Record<string, unknown>[];
+  } | null;
+}
+
+export interface DataSourcePreview {
+  columns: Array<{ name: string; type: string }>;
+  rows: Record<string, unknown>[];
+  total_rows: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
 // --- Concurrent refresh guard ---
 
 let isRefreshing = false;
@@ -204,8 +233,74 @@ const authApi = {
   },
 };
 
+// --- Data Sources API ---
+
+const dataSourcesApi = {
+  upload(file: File, name: string): Promise<DataSourceDetail> {
+    const accessToken = getAccessToken();
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("name", name);
+
+    const headers: Record<string, string> = {};
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    return fetch(`${API_URL}/api/v1/data-sources/upload`, {
+      method: "POST",
+      headers,
+      body: formData,
+    }).then(async (response) => {
+      if (!response.ok) {
+        let errorMessage = `Erreur ${response.status}`;
+        try {
+          const errorData = (await response.json()) as { detail?: string };
+          if (errorData.detail) {
+            errorMessage =
+              typeof errorData.detail === "string"
+                ? errorData.detail
+                : JSON.stringify(errorData.detail);
+          }
+        } catch {
+          // ignore JSON parse errors
+        }
+        throw new Error(errorMessage);
+      }
+      return response.json() as Promise<DataSourceDetail>;
+    });
+  },
+
+  list(skip = 0, limit = 100): Promise<DataSourceListItem[]> {
+    return request<DataSourceListItem[]>(
+      `/api/v1/data-sources/?skip=${skip}&limit=${limit}`
+    );
+  },
+
+  getById(id: string): Promise<DataSourceDetail> {
+    return request<DataSourceDetail>(`/api/v1/data-sources/${id}`);
+  },
+
+  delete(id: string): Promise<void> {
+    return request<void>(`/api/v1/data-sources/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  preview(
+    id: string,
+    page = 1,
+    pageSize = 50
+  ): Promise<DataSourcePreview> {
+    return request<DataSourcePreview>(
+      `/api/v1/data-sources/${id}/preview?page=${page}&page_size=${pageSize}`
+    );
+  },
+};
+
 export const api = {
   auth: authApi,
+  dataSources: dataSourcesApi,
 };
 
 // Keep backward-compatible export for any existing usage
