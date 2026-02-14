@@ -1,6 +1,6 @@
 "use client";
 
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 
 interface ColumnData {
   name: string;
@@ -8,11 +8,11 @@ interface ColumnData {
   role: 'dimension' | 'measure' | 'ignore';
 }
 
-export interface TableNodeData extends Record<string, unknown> {
+export type TableNodeData = Node<{
   label: string;
   columns: ColumnData[];
   dataSourceId: string;
-}
+}, 'tableNode'>;
 
 export function TableNode({ data }: NodeProps<TableNodeData>) {
   return (
@@ -26,7 +26,7 @@ export function TableNode({ data }: NodeProps<TableNodeData>) {
 
       {/* Columns */}
       <div className="divide-y divide-gray-100">
-        {data.columns.map((column, index) => {
+        {data.columns.map((column: ColumnData) => {
           const roleColor =
             column.role === 'dimension' ? 'text-blue-600 bg-blue-50' :
             column.role === 'measure' ? 'text-green-600 bg-green-50' :

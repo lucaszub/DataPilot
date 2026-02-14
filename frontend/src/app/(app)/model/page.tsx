@@ -28,7 +28,7 @@ const nodeTypes = { tableNode: TableNode };
 
 function ModelCanvas() {
   const reactFlowInstance = useReactFlow();
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<TableNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [dataSources, setDataSources] = useState<DataSourceListItem[]>([]);
   const [isLoadingSources, setIsLoadingSources] = useState(true);
@@ -67,6 +67,12 @@ function ModelCanvas() {
     const dataSourceId = event.dataTransfer.getData('application/datapilot-source');
     if (!dataSourceId) return;
 
+    // Capture drop coordinates synchronously before any async call
+    const dropPosition = reactFlowInstance.screenToFlowPosition({
+      x: event.clientX,
+      y: event.clientY,
+    });
+
     // Get the data source details to access schema_cache
     try {
       const dataSource: DataSourceDetail = await api.dataSources.getById(dataSourceId);
@@ -76,12 +82,7 @@ function ModelCanvas() {
         return;
       }
 
-      // Get drop position in ReactFlow coordinates
-      const reactFlowBounds = event.currentTarget.getBoundingClientRect();
-      const position = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX - reactFlowBounds.left,
-        y: event.clientY - reactFlowBounds.top,
-      });
+      const position = dropPosition;
 
       // Create columns with default role 'dimension'
       const columns = dataSource.schema_cache.columns.map(col => ({
@@ -91,7 +92,7 @@ function ModelCanvas() {
       }));
 
       // Create new table node
-      const newNode: Node<TableNodeData> = {
+      const newNode: TableNodeData = {
         id: `table-${dataSourceId}-${Date.now()}`,
         type: 'tableNode',
         position,
@@ -117,10 +118,10 @@ function ModelCanvas() {
       const definitions: SemanticLayerDefinitions = {
         nodes: nodes.map(node => ({
           id: node.id,
-          data_source_id: (node.data as TableNodeData).dataSourceId,
-          data_source_name: (node.data as TableNodeData).label,
+          data_source_id: node.data.dataSourceId,
+          data_source_name: node.data.label,
           position: node.position,
-          columns: (node.data as TableNodeData).columns,
+          columns: node.data.columns,
         })),
         edges: edges.map(edge => ({
           id: edge.id,

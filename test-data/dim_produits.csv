@@ -1,0 +1,13 @@
+produit_id,nom_produit,categorie,sous_categorie,prix_unitaire
+101,Licence DataPilot Basic,Logiciel,Licence,299.00
+102,Licence DataPilot Pro,Logiciel,Licence,599.00
+103,Licence DataPilot Enterprise,Logiciel,Licence,1499.00
+104,Formation Initiale,Service,Formation,1200.00
+105,Formation Avancée,Service,Formation,2400.00
+106,Support Standard,Service,Support,150.00
+107,Support Premium,Service,Support,450.00
+108,Module BI Dashboard,Logiciel,Add-on,199.00
+109,Module Connecteurs,Logiciel,Add-on,349.00
+110,Consulting Data,Service,Consulting,1800.00
+111,Migration Données,Service,Consulting,3500.00
+112,API Access Pack,Logiciel,Add-on,99.00
