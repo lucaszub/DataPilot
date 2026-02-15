@@ -249,7 +249,7 @@ Please review our [SECURITY.md](SECURITY.md) for:
 
 DataPilot is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 
-Copyright 2026 DataPilot contributors.
+Copyright 2026 Lucas Zubiarrain.
 
 ## Acknowledgments
 
