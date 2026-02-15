@@ -51,3 +51,12 @@ htmlcov/
 
 # Test data
 test-data/
+
+# Screenshots (mockup validation)
+frontend/screenshots/
+
+# Upload data (local tenant files)
+backend/uploads/
+
+# Debug / temp
+frontend/bug/

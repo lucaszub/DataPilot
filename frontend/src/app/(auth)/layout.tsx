@@ -6,9 +6,9 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex min-h-screen bg-background">
       {/* Left panel — branding (hidden on mobile) */}
-      <div className="relative hidden lg:flex lg:w-3/5 flex-col justify-between overflow-hidden bg-teal-600">
+      <div className="relative hidden lg:flex lg:w-3/5 flex-col justify-between overflow-hidden bg-gradient-to-br from-primary via-primary/90 to-primary/70">
         {/* Grid pattern background */}
         <div
           className="absolute inset-0"
@@ -21,7 +21,7 @@ export default function AuthLayout({
           }}
         />
         {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-teal-500/30 via-transparent to-teal-800/40" />
+        <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-black/20" />
 
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between h-full p-12">
@@ -54,7 +54,7 @@ export default function AuthLayout({
               <p className="text-4xl font-bold text-white leading-tight">
                 Connectez vos donnees.
               </p>
-              <p className="text-4xl font-bold text-teal-200 leading-tight">
+              <p className="text-4xl font-bold text-white/80 leading-tight">
                 Posez une question.
               </p>
               <p className="text-4xl font-bold text-white leading-tight">
@@ -62,7 +62,7 @@ export default function AuthLayout({
               </p>
             </div>
 
-            <p className="text-lg text-teal-100 max-w-md leading-relaxed">
+            <p className="text-lg text-white/80 max-w-md leading-relaxed">
               La Business Intelligence conversationnelle pour les PME
               francaises.
             </p>
@@ -91,21 +91,21 @@ export default function AuthLayout({
                       />
                     </svg>
                   </div>
-                  <span className="text-teal-100 text-sm">{feature}</span>
+                  <span className="text-white/80 text-sm">{feature}</span>
                 </li>
               ))}
             </ul>
           </div>
 
           {/* Footer */}
-          <p className="text-xs text-teal-200/60">
+          <p className="text-xs text-white/40">
             &copy; 2026 DataPilot &mdash; Heberge sur OVH, France
           </p>
         </div>
       </div>
 
       {/* Right panel — form */}
-      <div className="flex w-full lg:w-2/5 flex-col items-center justify-center px-6 py-12 bg-white">
+      <div className="flex w-full lg:w-2/5 flex-col items-center justify-center px-6 py-12 bg-card">
         <div className="w-full max-w-sm">{children}</div>
       </div>
     </div>

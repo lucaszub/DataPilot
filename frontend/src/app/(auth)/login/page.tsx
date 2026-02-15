@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Play } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 // --- Component ---
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, loginDemo } = useAuth();
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -41,8 +42,7 @@ export default function LoginPage() {
     setServerError(null);
     try {
       await login(data.email, data.password);
-      // Force a hard navigation so middleware picks up the new dp_token cookie
-      window.location.href = "/sources";
+      window.location.href = "/";
     } catch (err) {
       if (err instanceof Error) {
         setServerError(err.message);
@@ -52,11 +52,16 @@ export default function LoginPage() {
     }
   };
 
+  const handleDemo = () => {
+    loginDemo();
+    window.location.href = "/";
+  };
+
   return (
     <div className="space-y-6">
       {/* Mobile logo (visible only on small screens) */}
       <div className="flex items-center gap-3 lg:hidden">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-600 shadow-lg">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary shadow-lg">
           <svg
             className="h-5 w-5 text-white"
             fill="none"
@@ -72,21 +77,39 @@ export default function LoginPage() {
             />
           </svg>
         </div>
-        <span className="text-lg font-bold text-gray-900">DataPilot</span>
+        <span className="text-lg font-bold text-foreground">DataPilot</span>
       </div>
 
       {/* Header */}
       <div className="space-y-1">
-        <h2 className="text-2xl font-bold text-gray-900">Connexion</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="text-2xl font-bold text-foreground">Connexion</h2>
+        <p className="text-sm text-muted-foreground">
           Pas encore de compte ?{" "}
           <Link
             href="/register"
-            className="font-medium text-teal-600 hover:text-teal-500 transition-colors"
+            className="font-medium text-primary hover:text-primary/80 transition-colors"
           >
             Creer un compte
           </Link>
         </p>
+      </div>
+
+      {/* Demo mode button */}
+      <button
+        onClick={handleDemo}
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-primary to-primary/80 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity shadow-lg"
+      >
+        <Play className="h-5 w-5" />
+        Mode Demo — Explorer sans backend
+      </button>
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-card px-2 text-muted-foreground">ou connectez-vous</span>
+        </div>
       </div>
 
       {/* Server error alert */}

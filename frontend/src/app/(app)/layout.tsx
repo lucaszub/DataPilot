@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Settings,
   LogOut,
+  MessageCircle,
 } from "lucide-react";
 
 import {
@@ -24,6 +25,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useAuth } from "@/contexts/AuthContext";
 
 // --- Nav items ---
@@ -33,6 +35,7 @@ const navItems = [
   { label: "Modele", icon: GitMerge, href: "/model" },
   { label: "Explorer", icon: Code, href: "/explorer" },
   { label: "Tableaux de bord", icon: LayoutDashboard, href: "/dashboard" },
+  { label: "Chat IA", icon: MessageCircle, href: "/chat" },
   { label: "Parametres", icon: Settings, href: "/settings" },
 ] as const;
 
@@ -49,13 +52,13 @@ function AppSidebar() {
   }
 
   return (
-    <Sidebar className="border-r border-gray-200 bg-white">
+    <Sidebar className="border-r border-sidebar-border bg-sidebar-background">
       {/* Logo */}
-      <SidebarHeader className="px-4 py-4 border-b border-gray-100">
+      <SidebarHeader className="px-4 py-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-600">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <svg
-              className="h-5 w-5 text-white"
+              className="h-5 w-5 text-primary-foreground"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -69,7 +72,7 @@ function AppSidebar() {
               />
             </svg>
           </div>
-          <span className="text-base font-bold text-gray-900 tracking-tight">
+          <span className="text-base font-bold text-sidebar-foreground tracking-tight">
             DataPilot
           </span>
         </div>
@@ -87,8 +90,8 @@ function AppSidebar() {
                   isActive={isActive}
                   className={
                     isActive
-                      ? "bg-teal-50 text-teal-700 font-medium hover:bg-teal-100 hover:text-teal-700"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground hover:bg-muted hover:text-foreground"
                   }
                 >
                   <Link
@@ -106,24 +109,27 @@ function AppSidebar() {
         </SidebarMenu>
       </SidebarContent>
 
-      {/* Footer: user info + logout */}
-      <SidebarFooter className="border-t border-gray-100 px-4 py-3">
+      {/* Footer: user info + theme toggle + logout */}
+      <SidebarFooter className="border-t border-sidebar-border px-4 py-3 space-y-2">
         <div className="flex items-center justify-between gap-2">
           <p
-            className="truncate text-xs text-gray-500"
+            className="truncate text-xs text-muted-foreground"
             title={user?.email ?? ""}
           >
             {user?.email ?? ""}
           </p>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleLogout}
-            aria-label="Se deconnecter"
-            className="h-8 w-8 shrink-0 text-gray-500 hover:text-red-600 hover:bg-red-50"
-          >
-            <LogOut className="h-4 w-4" aria-hidden="true" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleLogout}
+              aria-label="Se deconnecter"
+              className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
         </div>
       </SidebarFooter>
     </Sidebar>
@@ -139,11 +145,11 @@ export default function AppLayout({
 }) {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-gray-50">
+      <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
         <div className="flex flex-1 flex-col min-w-0">
           {/* Mobile trigger */}
-          <header className="flex h-12 items-center border-b border-gray-200 bg-white px-4 md:hidden">
+          <header className="flex h-12 items-center border-b border-border bg-card px-4 md:hidden">
             <SidebarTrigger aria-label="Ouvrir le menu" />
           </header>
           <main className="flex-1 overflow-auto">
