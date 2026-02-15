@@ -10,7 +10,7 @@
 
 **DO NOT** open a public GitHub issue for security vulnerabilities.
 
-Instead, please email **security@datapilot.dev** with:
+Instead, please email **zubiarrainlucas@gmail.com** with:
 
 - Description of the vulnerability
 - Steps to reproduce
