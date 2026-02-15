@@ -1,0 +1,60 @@
+name: Feature Request
+description: Suggest a new feature for DataPilot
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please describe the problem you're trying to solve.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? Focus on the problem, not the solution.
+      placeholder: I'm frustrated when I try to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How do you think this should work?
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What other solutions have you considered?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which area of DataPilot does this relate to?
+      options:
+        - Data Sources / CSV Upload
+        - SQL Explorer
+        - Dashboard Builder
+        - Semantic Model / ERD
+        - AI / Text-to-SQL
+        - Authentication / Users
+        - API
+        - Infrastructure / DevOps
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any other context, screenshots, or examples?
+    validations:
+      required: false
