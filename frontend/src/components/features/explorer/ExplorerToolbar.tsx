@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Play, Table, Sheet, BarChart3, Grid3x3, Download, Code, Sparkles, Clock, Loader2, Terminal, Filter, RotateCcw } from 'lucide-react';
+import { Table, Sheet, BarChart3, Grid3x3, Download, Sparkles, Clock, Loader2, Terminal, Filter, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useExplorer, ViewMode, ChartType } from './ExplorerContext';
 
@@ -40,7 +40,7 @@ const chartTypeIcons: Record<ChartType, React.ReactNode> = {
 };
 
 export function ExplorerToolbar() {
-  const { state, dispatch, executeQuery } = useExplorer();
+  const { state, dispatch } = useExplorer();
 
   const setViewMode = (mode: ViewMode) => {
     dispatch({ type: 'SET_VIEW_MODE', mode });
@@ -48,10 +48,6 @@ export function ExplorerToolbar() {
 
   const setChartType = (chartType: ChartType) => {
     dispatch({ type: 'SET_CHART_TYPE', chartType });
-  };
-
-  const toggleSqlMode = () => {
-    dispatch({ type: 'SET_SQL_MODE', mode: state.sqlMode === 'visual' ? 'sql' : 'visual' });
   };
 
   const toggleSqlPreview = () => {
@@ -78,30 +74,14 @@ export function ExplorerToolbar() {
     dispatch({ type: 'SET_QUERY_LIMIT', limit });
   };
 
-  const canExecute = state.selectedFields.length > 0;
-
   return (
     <div className="flex items-center justify-between px-4 py-3 bg-card border-b border-border">
       {/* Left group */}
       <div className="flex items-center gap-3">
-        {/* Run button */}
-        <button
-          onClick={executeQuery}
-          disabled={!canExecute || state.isExecuting}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors",
-            canExecute && !state.isExecuting
-              ? "bg-primary text-white hover:bg-primary/90"
-              : "bg-muted text-muted-foreground cursor-not-allowed"
-          )}
-        >
-          {state.isExecuting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Play className="h-4 w-4" />
-          )}
-          <span>Exécuter</span>
-        </button>
+        {/* Loading indicator */}
+        {state.isExecuting && (
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+        )}
 
         {/* View mode selector */}
         <div className="flex items-center bg-muted rounded-lg p-1">

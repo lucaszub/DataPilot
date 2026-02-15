@@ -43,6 +43,7 @@ function ExplorerContent() {
           </div>
         )}
 
+
         {/* SQL Preview */}
         <SqlPreviewPanel />
 
@@ -75,10 +76,10 @@ function ExplorerContent() {
             </div>
           )}
 
-          {state.selectedFields.length > 0 && !state.result && (
+          {state.selectedFields.length > 0 && !state.result && !state.isExecuting && (
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
               <p className="text-sm text-muted-foreground">
-                Cliquez sur <strong>Executer</strong> pour lancer la requete.
+                Chargement en cours...
               </p>
             </div>
           )}

@@ -119,6 +119,7 @@ type ExplorerAction =
   | { type: 'UPDATE_FILTER'; filterId: string; filter: Partial<ExplorerFilter> }
   | { type: 'ADD_SORT'; sort: ExplorerSort }
   | { type: 'REMOVE_SORT'; sortId: string }
+  | { type: 'UPDATE_SORT'; sortId: string; direction: 'ASC' | 'DESC' }
   | { type: 'SET_QUERY_LIMIT'; limit: number }
   | { type: 'SET_RESULT'; result: ExplorerQueryResult }
   | { type: 'SET_ERROR'; error: string }
@@ -275,10 +276,10 @@ export function generateSqlFromState(state: ExplorerState, relationships: Relati
     }
   }
 
-  // ORDER BY
+  // ORDER BY — use column alias (not table.column) to support aggregated aliases like sum_quantite
   const orderByParts: string[] = [];
   for (const sort of state.sortRules) {
-    orderByParts.push(`"${sort.tableName}"."${sort.column}" ${sort.direction}`);
+    orderByParts.push(`"${sort.column}" ${sort.direction}`);
   }
 
   // Build final SQL
@@ -393,6 +394,14 @@ function createReducer(relationships: RelationshipDef[]) {
         return withSql({
           ...state,
           sortRules: state.sortRules.filter(s => s.id !== action.sortId),
+        });
+
+      case 'UPDATE_SORT':
+        return withSql({
+          ...state,
+          sortRules: state.sortRules.map(s =>
+            s.id === action.sortId ? { ...s, direction: action.direction } : s
+          ),
         });
 
       case 'SET_QUERY_LIMIT':
@@ -578,11 +587,13 @@ export function ExplorerProvider({ children, tables, relationships, workspaceId 
     if (state.selectedFields.length === 0) return;
     if (!workspaceId) return;
 
-    const fieldsKey = JSON.stringify(
-      state.selectedFields.map(f => ({
+    const fieldsKey = JSON.stringify({
+      fields: state.selectedFields.map(f => ({
         id: f.id, agg: f.aggregation, gran: f.dateGranularity, qc: f.quickCalc,
-      }))
-    );
+      })),
+      sorts: state.sortRules.map(s => ({ id: s.id, dir: s.direction })),
+      filters: state.filters.map(f => ({ id: f.id, op: f.operator, val: f.value, val2: f.value2 })),
+    });
 
     if (fieldsKey !== prevFieldsRef.current) {
       prevFieldsRef.current = fieldsKey;
@@ -591,7 +602,7 @@ export function ExplorerProvider({ children, tables, relationships, workspaceId 
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [state.selectedFields, state.autoExecute, workspaceId, executeQuery]);
+  }, [state.selectedFields, state.sortRules, state.filters, state.autoExecute, workspaceId, executeQuery]);
 
   // Wrap result with calculated columns
   const enrichedState = React.useMemo(() => {

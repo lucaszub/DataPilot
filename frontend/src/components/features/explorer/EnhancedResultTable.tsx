@@ -4,13 +4,11 @@ import React, { useMemo, useState } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
-  getSortedRowModel,
   getPaginationRowModel,
   ColumnDef,
-  SortingState,
   flexRender,
 } from '@tanstack/react-table';
-import { ArrowUp, ArrowDown, ChevronLeft, ChevronRight, MoreHorizontal, Plus, X, Calculator } from 'lucide-react';
+import { ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, MoreHorizontal, Plus, X, Calculator } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useExplorer, calcFormulaLabels } from './ExplorerContext';
 import { ColumnActionsMenu } from './ColumnActionsMenu';
@@ -54,7 +52,6 @@ interface ColumnMenuState {
 
 export function EnhancedResultTable() {
   const { state, dispatch } = useExplorer();
-  const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnMenu, setColumnMenu] = useState<ColumnMenuState>({ column: null, position: { x: 0, y: 0 } });
   const [showCalcModal, setShowCalcModal] = useState(false);
   const [calcModalPreselect, setCalcModalPreselect] = useState<string | undefined>(undefined);
@@ -97,35 +94,38 @@ export function EnhancedResultTable() {
             );
           }
 
-          // Normal column header
+          // Normal column header — sort by clicking (ASC → DESC → remove)
+          const existingSort = state.sortRules.find(s => s.column === col.key);
+
           return (
             <div className="flex items-center gap-1 group/header">
               <button
                 onClick={() => {
-                  const currentSort = column.getIsSorted();
-                  const newDirection = currentSort === 'asc' ? 'desc' : 'asc';
-
-                  const existingSort = state.sortRules.find(s => s.column === col.name && s.tableName === col.tableName);
                   if (existingSort) {
-                    dispatch({ type: 'REMOVE_SORT', sortId: existingSort.id });
+                    if (existingSort.direction === 'ASC') {
+                      dispatch({ type: 'UPDATE_SORT', sortId: existingSort.id, direction: 'DESC' });
+                    } else {
+                      dispatch({ type: 'REMOVE_SORT', sortId: existingSort.id });
+                    }
+                  } else {
+                    dispatch({
+                      type: 'ADD_SORT',
+                      sort: {
+                        id: `sort-${Date.now()}`,
+                        column: col.key,
+                        tableName: col.tableName,
+                        direction: 'ASC',
+                      },
+                    });
                   }
-
-                  const newSort = {
-                    id: `sort-${Date.now()}`,
-                    column: col.name,
-                    tableName: col.tableName,
-                    direction: newDirection === 'asc' ? 'ASC' as const : 'DESC' as const,
-                  };
-                  dispatch({ type: 'ADD_SORT', sort: newSort });
-
-                  column.toggleSorting(newDirection === 'desc');
                 }}
                 className="flex items-center gap-1.5 font-medium text-left hover:text-primary transition-colors flex-1"
               >
                 <span className="text-[10px] text-muted-foreground">{col.tableName}.</span>
                 {col.name}
-                {column.getIsSorted() === 'asc' && <ArrowUp className="h-3.5 w-3.5" />}
-                {column.getIsSorted() === 'desc' && <ArrowDown className="h-3.5 w-3.5" />}
+                {existingSort?.direction === 'ASC' && <ArrowUp className="h-3.5 w-3.5 text-primary" />}
+                {existingSort?.direction === 'DESC' && <ArrowDown className="h-3.5 w-3.5 text-primary" />}
+                {!existingSort && <ArrowUpDown className="h-3.5 w-3.5 opacity-0 group-hover/header:opacity-50 transition-opacity" />}
               </button>
               <button
                 onClick={(e) => {
@@ -209,12 +209,7 @@ export function EnhancedResultTable() {
   const table = useReactTable({
     data: state.result?.rows || [],
     columns,
-    state: {
-      sorting,
-    },
-    onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     initialState: {
       pagination: {
@@ -230,7 +225,7 @@ export function EnhancedResultTable() {
           <p className="text-muted-foreground">
             {state.selectedFields.length === 0
               ? 'Sélectionnez des champs pour commencer'
-              : 'Cliquez sur "Exécuter" pour voir les résultats'}
+              : 'En attente des résultats...'}
           </p>
         </div>
       </div>
