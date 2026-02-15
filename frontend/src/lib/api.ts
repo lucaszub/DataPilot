@@ -110,6 +110,22 @@ export interface SemanticLayerListItem {
   created_at: string;
 }
 
+// --- Auto-Detect Join Types ---
+
+export interface SuggestedEdge {
+  source_ds_id: string;
+  source_column: string;
+  target_ds_id: string;
+  target_column: string;
+  join_type: string;
+  confidence: number;
+  reason: string;
+}
+
+export interface AutoDetectResponse {
+  suggested_edges: SuggestedEdge[];
+}
+
 // --- Query Types ---
 
 export interface ColumnInfo {
@@ -282,6 +298,11 @@ async function request<T>(
     throw new Error(errorMessage);
   }
 
+  // Handle 204 No Content (e.g. DELETE responses)
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json() as Promise<T>;
 }
 
@@ -381,6 +402,20 @@ const dataSourcesApi = {
       `/api/v1/data-sources/${id}/preview?page=${page}&page_size=${pageSize}`
     );
   },
+
+  updateColumnType(
+    dataSourceId: string,
+    columnName: string,
+    newType: string
+  ): Promise<DataSourceDetail> {
+    return request<DataSourceDetail>(
+      `/api/v1/data-sources/${dataSourceId}/columns/${encodeURIComponent(columnName)}/type`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ new_type: newType }),
+      }
+    );
+  },
 };
 
 // --- Workspace Types ---
@@ -439,6 +474,13 @@ const semanticLayersApi = {
 
   delete(id: string): Promise<void> {
     return request<void>(`/api/v1/semantic-layers/${id}`, { method: 'DELETE' });
+  },
+
+  autoDetect(dataSourceIds: string[]): Promise<AutoDetectResponse> {
+    return request<AutoDetectResponse>('/api/v1/semantic-layers/auto-detect', {
+      method: 'POST',
+      body: JSON.stringify({ data_source_ids: dataSourceIds }),
+    });
   },
 };
 

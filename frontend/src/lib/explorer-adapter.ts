@@ -13,6 +13,7 @@ export interface ExplorerColumnInfo {
   name: string;
   type: string;
   tableName: string;
+  role: 'dimension' | 'measure';
 }
 
 export interface ExplorerQueryResult {
@@ -91,6 +92,9 @@ export function adaptQueryResponse(
       name: col.name,
       type: col.type,
       tableName: matched?.tableName || '',
+      role: matched?.role === 'dimension' || matched?.role === 'measure'
+        ? matched.role
+        : classifyByType(col.type),
     };
   });
 

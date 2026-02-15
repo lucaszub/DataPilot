@@ -471,6 +471,7 @@ export function applyCalculatedColumns(
       name: calc.label,
       type: 'DOUBLE',
       tableName: '_calculated',
+      role: 'measure',
     });
 
     for (let i = 0; i < newRows.length; i++) {

@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { X, Type, Hash, Calendar, TrendingUp, ChevronDown, Calculator } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useExplorer, AggregationType, DateGranularity, QuickCalcType, quickCalcLabels } from './ExplorerContext';
+import { useExplorer, AggregationType, DateGranularity, QuickCalcType, quickCalcLabels, SelectedField } from './ExplorerContext';
+
+const NUMERIC_TYPES = ['DOUBLE', 'FLOAT', 'DECIMAL', 'INTEGER', 'BIGINT', 'SMALLINT', 'TINYINT', 'HUGEINT'];
 
 const typeIcons: Record<string, React.ReactNode> = {
   string: <Type className="h-3 w-3" />,
@@ -72,6 +74,7 @@ function MiniDropdown({ trigger, children, className }: DropdownProps) {
 
 export function FieldDropZones() {
   const { state, dispatch } = useExplorer();
+  const [dragOverZone, setDragOverZone] = useState<'dimension' | 'measure' | null>(null);
 
   const dimensions = state.selectedFields.filter(f => f.role === 'dimension');
   const measures = state.selectedFields.filter(f => f.role === 'measure');
@@ -79,6 +82,40 @@ export function FieldDropZones() {
   const removeField = (fieldId: string) => {
     dispatch({ type: 'REMOVE_FIELD', fieldId });
   };
+
+  const handleDrop = useCallback((targetRole: 'dimension' | 'measure') => (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverZone(null);
+    const data = e.dataTransfer.getData('application/datapilot-field');
+    if (!data) return;
+    const { tableName, columnName, columnType } = JSON.parse(data) as {
+      tableName: string; columnName: string; columnType: string; role: string;
+    };
+    // Don't add if already selected
+    if (state.selectedFields.some(f => f.tableName === tableName && f.name === columnName)) return;
+
+    const isNumeric = NUMERIC_TYPES.includes(columnType.toUpperCase());
+    const field: SelectedField = {
+      id: `${tableName}.${columnName}`,
+      name: columnName,
+      tableName,
+      type: columnType,
+      role: targetRole,
+      aggregation: targetRole === 'measure' ? (isNumeric ? 'SUM' : 'COUNT') : 'none',
+      dateGranularity: ['TIMESTAMP', 'DATE', 'TIME'].includes(columnType.toUpperCase()) ? 'month' : 'raw',
+    };
+    dispatch({ type: 'ADD_FIELD', field });
+  }, [state.selectedFields, dispatch]);
+
+  const handleDragOver = useCallback((zone: 'dimension' | 'measure') => (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setDragOverZone(zone);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverZone(null);
+  }, []);
 
   const setAggregation = (fieldId: string, aggregation: AggregationType) => {
     dispatch({ type: 'UPDATE_FIELD_AGGREGATION', fieldId, aggregation });
@@ -99,7 +136,15 @@ export function FieldDropZones() {
   return (
     <div className="space-y-2">
       {/* Dimensions zone */}
-      <div className="bg-card border border-border rounded-lg p-3">
+      <div
+        className={cn(
+          "bg-card border rounded-lg p-3 transition-colors",
+          dragOverZone === 'dimension' ? "border-blue-400 bg-blue-50/50" : "border-border"
+        )}
+        onDragOver={handleDragOver('dimension')}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop('dimension')}
+      >
         <div className="flex items-center gap-2 mb-2">
           <Type className="h-4 w-4 text-blue-500" />
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -113,9 +158,12 @@ export function FieldDropZones() {
         </div>
 
         {dimensions.length === 0 ? (
-          <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
+          <div className={cn(
+            "border-2 border-dashed rounded-lg p-4 text-center transition-colors",
+            dragOverZone === 'dimension' ? "border-blue-400 bg-blue-50/50" : "border-border"
+          )}>
             <p className="text-sm text-muted-foreground">
-              Cliquez sur des champs dans le panneau de gauche
+              Glissez ou cliquez sur des champs du panneau de gauche
             </p>
           </div>
         ) : (
@@ -172,7 +220,15 @@ export function FieldDropZones() {
       </div>
 
       {/* Measures zone */}
-      <div className="bg-card border border-border rounded-lg p-3">
+      <div
+        className={cn(
+          "bg-card border rounded-lg p-3 transition-colors",
+          dragOverZone === 'measure' ? "border-primary bg-primary/5" : "border-border"
+        )}
+        onDragOver={handleDragOver('measure')}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop('measure')}
+      >
         <div className="flex items-center gap-2 mb-2">
           <TrendingUp className="h-4 w-4 text-primary" />
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -186,9 +242,12 @@ export function FieldDropZones() {
         </div>
 
         {measures.length === 0 ? (
-          <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
+          <div className={cn(
+            "border-2 border-dashed rounded-lg p-4 text-center transition-colors",
+            dragOverZone === 'measure' ? "border-primary bg-primary/5" : "border-border"
+          )}>
             <p className="text-sm text-muted-foreground">
-              Cliquez sur des mesures dans le panneau de gauche
+              Glissez des mesures ou dimensions ici (COUNT automatique)
             </p>
           </div>
         ) : (

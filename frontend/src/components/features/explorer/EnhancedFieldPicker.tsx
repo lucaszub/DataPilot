@@ -88,11 +88,31 @@ export function EnhancedFieldPicker() {
     });
   };
 
-  const handleContextAction = (action: 'add' | 'filter' | 'sort_asc' | 'sort_desc' | 'preview') => {
+  const addFieldAs = (tableName: string, columnName: string, columnType: string, targetRole: 'dimension' | 'measure') => {
+    const isNumeric = ['DOUBLE', 'FLOAT', 'DECIMAL', 'INTEGER', 'BIGINT', 'SMALLINT', 'TINYINT', 'HUGEINT'].includes(columnType.toUpperCase());
+    const field: SelectedField = {
+      id: `${tableName}.${columnName}`,
+      name: columnName,
+      tableName,
+      type: columnType,
+      role: targetRole,
+      aggregation: targetRole === 'measure' ? (isNumeric ? 'SUM' : 'COUNT') : 'none',
+      dateGranularity: ['TIMESTAMP', 'DATE', 'TIME'].includes(columnType.toUpperCase()) ? 'month' : 'raw',
+    };
+    dispatch({ type: 'ADD_FIELD', field });
+  };
+
+  const handleContextAction = (action: 'add' | 'add_as_measure' | 'add_as_dimension' | 'filter' | 'sort_asc' | 'sort_desc' | 'preview') => {
     const { tableName, columnName, columnType, role } = contextMenu;
     switch (action) {
       case 'add':
         addField(tableName, columnName, columnType, role);
+        break;
+      case 'add_as_measure':
+        addFieldAs(tableName, columnName, columnType, 'measure');
+        break;
+      case 'add_as_dimension':
+        addFieldAs(tableName, columnName, columnType, 'dimension');
         break;
       case 'filter':
         dispatch({
@@ -276,10 +296,20 @@ export function EnhancedFieldPicker() {
                         return (
                           <button
                             key={col.name}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('application/datapilot-field', JSON.stringify({
+                                tableName: table.name,
+                                columnName: col.name,
+                                columnType: col.type,
+                                role: col.role,
+                              }));
+                              e.dataTransfer.effectAllowed = 'copy';
+                            }}
                             onClick={() => !selected && addField(table.name, col.name, col.type, col.role)}
                             onContextMenu={(e) => handleContextMenu(e, table.name, col.name, col.type, col.role)}
                             className={cn(
-                              "w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted/50 transition-colors",
+                              "w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted/50 transition-colors cursor-grab active:cursor-grabbing",
                               selected && "bg-primary/10"
                             )}
                             title={col.name}
@@ -317,10 +347,20 @@ export function EnhancedFieldPicker() {
                         return (
                           <button
                             key={col.name}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('application/datapilot-field', JSON.stringify({
+                                tableName: table.name,
+                                columnName: col.name,
+                                columnType: col.type,
+                                role: col.role,
+                              }));
+                              e.dataTransfer.effectAllowed = 'copy';
+                            }}
                             onClick={() => !selected && addField(table.name, col.name, col.type, col.role)}
                             onContextMenu={(e) => handleContextMenu(e, table.name, col.name, col.type, col.role)}
                             className={cn(
-                              "w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted/50 transition-colors",
+                              "w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted/50 transition-colors cursor-grab active:cursor-grabbing",
                               selected && "bg-primary/10"
                             )}
                             title={col.name}
@@ -413,6 +453,24 @@ export function EnhancedFieldPicker() {
               <Eye className="h-3.5 w-3.5 text-muted-foreground" />
               Ajouter à la requête
             </button>
+            {contextMenu.role === 'dimension' && (
+              <button
+                onClick={() => handleContextAction('add_as_measure')}
+                className="w-full px-3 py-1.5 flex items-center gap-2 text-sm text-foreground hover:bg-muted/50 transition-colors"
+              >
+                <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+                Ajouter comme mesure (COUNT)
+              </button>
+            )}
+            {contextMenu.role === 'measure' && (
+              <button
+                onClick={() => handleContextAction('add_as_dimension')}
+                className="w-full px-3 py-1.5 flex items-center gap-2 text-sm text-foreground hover:bg-muted/50 transition-colors"
+              >
+                <Type className="h-3.5 w-3.5 text-muted-foreground" />
+                Ajouter comme dimension
+              </button>
+            )}
             <button
               onClick={() => handleContextAction('filter')}
               className="w-full px-3 py-1.5 flex items-center gap-2 text-sm text-foreground hover:bg-muted/50 transition-colors"
