@@ -51,3 +51,6 @@ htmlcov/
 
 # Test data
 test-data/
+
+# Screenshots (mockup validation)
+frontend/screenshots/
