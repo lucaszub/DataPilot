@@ -39,11 +39,10 @@
   - 1 dimension + 1 mesure (peu de valeurs) = Pie
 - Composant `ExplorerChart.tsx` (existe deja, a enrichir)
 
-### 3.3 Mode calcul triple
-Petit panneau lateral (drawer) avec 3 onglets:
+### 3.3 Mode calcul Excel/SQL
+Petit panneau lateral (drawer) avec 2 onglets:
 1. **Spreadsheet** — formules type Excel (`=A1-B1`, `=SUM(A:A)`)
 2. **SQL** — expression SQL libre (deja fait via custom calc)
-3. **Langage naturel** — champ texte "Calcule la marge en %" → genere le SQL
 
 ---
 
@@ -98,9 +97,16 @@ POST /api/v1/dashboards/:id/widgets    → ajouter widget
 
 ---
 
-## Sprint 6 — Chat IA (text-to-SQL)
+## Sprint 6 — Langage naturel + Chat IA (text-to-SQL)
 
-### 6.1 Backend
+> Prerequis: Sprints 4+5 termines (backend fonctionnel, donnees reelles)
+
+### 6.1 Calcul en langage naturel (Explorer)
+- Ajout d'un 3e onglet "IA" dans le panneau calcul (Sprint 3.3)
+- Champ texte: "Calcule la marge en %" → genere l'expression SQL
+- Necessite le backend IA pour fonctionner
+
+### 6.2 Chat IA (page dediee)
 ```
 POST /api/v1/ai/query
 Body: { question, data_source_id, conversation_history[] }
@@ -108,8 +114,6 @@ Response: { sql, explanation, results }
 ```
 - Prompt engineering avec schema + semantic layer en contexte
 - Multi-provider (Claude / OpenAI) via `LLMProvider` abstraction
-
-### 6.2 Frontend
 - Remplacer le mock chat par des vrais appels
 - Afficher resultats inline (tableau + chart)
 - Bouton "Envoyer vers Explorer" pour affiner la requete
@@ -122,7 +126,7 @@ Response: { sql, explanation, results }
 Sprint 3 (Explorer frontend)  ← NEXT
   └─ 3.1 COUNT sur dimensions
   └─ 3.2 Graphiques Explorer
-  └─ 3.3 Mode calcul triple
+  └─ 3.3 Mode calcul Excel/SQL
 
 Sprint 4 (Backend)
   └─ 4.1 API Explorer
@@ -134,9 +138,10 @@ Sprint 5 (Dashboard)
   └─ 5.1 Backend dashboards
   └─ 5.2 Frontend integration
 
-Sprint 6 (Chat IA)
-  └─ 6.1 Backend text-to-SQL
-  └─ 6.2 Frontend integration
+Sprint 6 (Langage naturel + Chat IA)  ← DERNIER
+  └─ 6.1 Calcul IA dans Explorer
+  └─ 6.2 Chat text-to-SQL
+  ⚠️  Necessite backend + donnees reelles (Sprints 4+5)
 ```
 
 ---
@@ -147,7 +152,7 @@ Sprint 6 (Chat IA)
 |-----------|-----|
 | Tables | TanStack Table |
 | Charts | Recharts |
-| SQL editor | CodeMirror 6 (a installer sprint 3.3) |
+| SQL editor | CodeMirror 6 (a installer sprint 3.3 si besoin) |
 | Grid dashboard | react-grid-layout |
 | Query engine | DuckDB (backend) |
 | IA | Claude API / OpenAI |
