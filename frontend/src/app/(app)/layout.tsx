@@ -11,6 +11,8 @@ import {
   Settings,
   LogOut,
   MessageCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 
 import {
@@ -22,7 +24,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -52,7 +56,7 @@ function AppSidebar() {
   }
 
   return (
-    <Sidebar className="border-r border-sidebar-border bg-sidebar-background">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar-background">
       {/* Logo */}
       <SidebarHeader className="px-4 py-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
@@ -88,6 +92,7 @@ function AppSidebar() {
                 <SidebarMenuButton
                   asChild
                   isActive={isActive}
+                  tooltip={item.label}
                   className={
                     isActive
                       ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -132,7 +137,25 @@ function AppSidebar() {
           </div>
         </div>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
+  );
+}
+
+// --- Sidebar trigger with dynamic icon ---
+
+function SidebarToggle() {
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
+
+  return (
+    <SidebarTrigger aria-label={isCollapsed ? "Ouvrir le menu" : "Fermer le menu"}>
+      {isCollapsed ? (
+        <PanelLeftOpen className="h-4 w-4" />
+      ) : (
+        <PanelLeftClose className="h-4 w-4" />
+      )}
+    </SidebarTrigger>
   );
 }
 
@@ -148,9 +171,9 @@ export default function AppLayout({
       <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
         <div className="flex flex-1 flex-col min-w-0">
-          {/* Mobile trigger */}
-          <header className="flex h-12 items-center border-b border-border bg-card px-4 md:hidden">
-            <SidebarTrigger aria-label="Ouvrir le menu" />
+          {/* Sidebar trigger */}
+          <header className="flex h-12 items-center border-b border-border bg-card px-4">
+            <SidebarToggle />
           </header>
           <main className="flex-1 overflow-auto">
             {children}

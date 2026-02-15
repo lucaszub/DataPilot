@@ -18,16 +18,26 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Save, Database, Loader2, Search, X, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
+import { Save, Database, Loader2, Search, X, CheckCircle2, AlertCircle, Sparkles, Wand2, Trash2 } from 'lucide-react';
 import { TableNode, type TableNodeData } from '@/components/features/TableNode';
 import { JoinEdge, type JoinEdgeData } from '@/components/features/JoinEdge';
 import { JoinConfigPanel, type JoinConfig } from '@/components/features/JoinConfigPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { api, type DataSourceListItem, type DataSourceDetail, type SemanticLayerDefinitions, type SemanticLayerDetail } from '@/lib/api';
+import { api, type DataSourceListItem, type DataSourceDetail, type SemanticLayerDefinitions, type SemanticLayerDetail, type SuggestedEdge } from '@/lib/api';
 
 const nodeTypes = { tableNode: TableNode };
 const edgeTypes = { joinEdge: JoinEdge };
+
+const NUMERIC_TYPES = ['DOUBLE', 'FLOAT', 'DECIMAL', 'INTEGER', 'BIGINT', 'SMALLINT', 'TINYINT', 'HUGEINT'];
+
+/** Infer column role: numeric cols are measures (except _id), rest are dimensions */
+function inferColumnRole(name: string, type: string): 'dimension' | 'measure' {
+  const lower = name.toLowerCase();
+  if (lower.endsWith('_id') || lower === 'id') return 'dimension';
+  if (NUMERIC_TYPES.includes(type.toUpperCase())) return 'measure';
+  return 'dimension';
+}
 
 interface PendingConnection {
   connection: Connection;
@@ -52,6 +62,10 @@ function ModelCanvas() {
   const [searchQuery, setSearchQuery] = useState('');
   const [pendingConnection, setPendingConnection] = useState<PendingConnection | null>(null);
   const [editingEdge, setEditingEdge] = useState<{ edge: Edge; sourceNode: Node<TableNodeData['data']>; targetNode: Node<TableNodeData['data']> } | null>(null);
+  const [hasExistingLayer, setHasExistingLayer] = useState(false);
+  const [isAutoDetecting, setIsAutoDetecting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Fetch or create default workspace, then load existing semantic layer
   useEffect(() => {
@@ -71,6 +85,7 @@ function ModelCanvas() {
         // Load existing semantic layer for this workspace (if any)
         const layers = await api.semanticLayers.list(wsId);
         if (layers.length > 0) {
+          setHasExistingLayer(true);
           const layer = await api.semanticLayers.getById(layers[0].id);
           setCurrentLayerId(layer.id);
           setModelName(layer.name);
@@ -301,11 +316,11 @@ function ModelCanvas() {
 
       const position = dropPosition;
 
-      // Create columns with default role 'dimension'
+      // Infer column roles from type (numeric = measure, except _id = dimension)
       const columns = dataSource.schema_cache.columns.map(col => ({
         name: col.name,
         type: col.type,
-        role: 'dimension' as const,
+        role: inferColumnRole(col.name, col.type),
       }));
 
       // Create new table node
@@ -406,6 +421,115 @@ function ModelCanvas() {
       setIsSaving(false);
     }
   }, [nodes, edges, modelName, workspaceId, currentLayerId]);
+
+  const handleDelete = useCallback(async () => {
+    if (!currentLayerId) return;
+
+    setIsDeleting(true);
+    try {
+      await api.semanticLayers.delete(currentLayerId);
+      // Reset canvas
+      setNodes([]);
+      setEdges([]);
+      setCurrentLayerId(null);
+      setHasExistingLayer(false);
+      setModelName('Mon modele');
+      setShowDeleteConfirm(false);
+      setSaveStatus('success');
+      setSaveMessage('Modele supprime');
+      setTimeout(() => {
+        setSaveStatus('idle');
+        setSaveMessage(null);
+      }, 3000);
+    } catch (error) {
+      console.error('Failed to delete semantic layer:', error);
+      setSaveStatus('error');
+      setSaveMessage('Erreur lors de la suppression');
+      setTimeout(() => {
+        setSaveStatus('idle');
+        setSaveMessage(null);
+      }, 3000);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [currentLayerId, setNodes, setEdges]);
+
+  // Auto-detect: load all sources onto canvas and detect joins
+  const handleAutoDetect = useCallback(async () => {
+    if (dataSources.length < 2) return;
+
+    setIsAutoDetecting(true);
+    try {
+      // Fetch full details for all sources (need schema_cache)
+      const details = await Promise.all(
+        dataSources.map((ds) => api.dataSources.getById(ds.id))
+      );
+
+      // Arrange nodes in a grid layout (3 columns)
+      const COLS = 3;
+      const X_GAP = 380;
+      const Y_GAP = 400;
+
+      const newNodes: TableNodeData[] = details
+        .filter((ds) => ds.schema_cache)
+        .map((ds, idx) => ({
+          id: `table-${ds.id}-${Date.now()}-${idx}`,
+          type: 'tableNode' as const,
+          position: {
+            x: (idx % COLS) * X_GAP + 50,
+            y: Math.floor(idx / COLS) * Y_GAP + 50,
+          },
+          data: {
+            label: ds.name,
+            columns: ds.schema_cache!.columns.map((col) => ({
+              name: col.name,
+              type: col.type,
+              role: inferColumnRole(col.name, col.type),
+            })),
+            dataSourceId: ds.id,
+          },
+        }));
+
+      setNodes(newNodes);
+
+      // Call backend auto-detect
+      const dsIds = dataSources.map((ds) => ds.id);
+      const result = await api.semanticLayers.autoDetect(dsIds);
+
+      // Build a lookup: data_source_id -> node_id
+      const dsIdToNodeId: Record<string, string> = {};
+      for (const node of newNodes) {
+        dsIdToNodeId[node.data.dataSourceId] = node.id;
+      }
+
+      // Create edges from suggestions
+      const newEdges: Edge[] = result.suggested_edges
+        .filter(
+          (s) =>
+            dsIdToNodeId[s.source_ds_id] !== undefined &&
+            dsIdToNodeId[s.target_ds_id] !== undefined
+        )
+        .map((s, idx) => ({
+          id: `auto-edge-${idx}-${Date.now()}`,
+          source: dsIdToNodeId[s.source_ds_id],
+          target: dsIdToNodeId[s.target_ds_id],
+          sourceHandle: `${s.source_column}-source`,
+          targetHandle: `${s.target_column}-target`,
+          type: 'joinEdge' as const,
+          data: {
+            joinType: s.join_type,
+            sourceColumn: s.source_column,
+            targetColumn: s.target_column,
+          } as JoinEdgeData,
+        }));
+
+      setEdges(newEdges);
+    } catch (error) {
+      console.error('Auto-detect failed:', error);
+    } finally {
+      setIsAutoDetecting(false);
+    }
+  }, [dataSources, setNodes, setEdges]);
 
   return (
     <div className="flex h-[calc(100vh-4rem)]">
@@ -521,6 +645,39 @@ function ModelCanvas() {
                 )}
               </div>
             )}
+            {currentLayerId && (
+              <Button
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={isDeleting}
+                variant="outline"
+                size="default"
+                className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                aria-label="Supprimer le modele"
+              >
+                {isDeleting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 h-4 w-4" />
+                )}
+                Supprimer
+              </Button>
+            )}
+            {!hasExistingLayer && dataSources.length >= 2 && (
+              <Button
+                onClick={handleAutoDetect}
+                disabled={isAutoDetecting}
+                variant="outline"
+                aria-label="Auto-detecter les relations"
+                size="default"
+              >
+                {isAutoDetecting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Wand2 className="mr-2 h-4 w-4" />
+                )}
+                Auto-detecter
+              </Button>
+            )}
             <Button
               onClick={handleSave}
               disabled={isSaving || nodes.length === 0}
@@ -554,12 +711,28 @@ function ModelCanvas() {
                   Creez votre modele de donnees
                 </h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Glissez-deposez des sources depuis le panneau de gauche pour commencer.
-                  Connectez les colonnes pour definir les relations entre vos tables.
+                  Glissez-deposez des sources depuis le panneau de gauche pour commencer,
+                  ou utilisez la detection automatique des relations.
                 </p>
+                {dataSources.length >= 2 && !hasExistingLayer && (
+                  <div className="pointer-events-auto mb-4">
+                    <Button
+                      onClick={handleAutoDetect}
+                      disabled={isAutoDetecting}
+                      size="default"
+                    >
+                      {isAutoDetecting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Wand2 className="mr-2 h-4 w-4" />
+                      )}
+                      Auto-detecter les relations
+                    </Button>
+                  </div>
+                )}
                 <div className="inline-flex items-center gap-2 text-xs text-gray-500 bg-gray-100 px-3 py-2 rounded-lg">
                   <span className="font-semibold">Astuce:</span>
-                  Cliquez sur les badges (D/M/—) pour changer le role des colonnes
+                  Cliquez sur les badges (D/M/--) pour changer le role des colonnes
                 </div>
               </div>
             </div>
@@ -596,6 +769,43 @@ function ModelCanvas() {
               onConfirm={handleJoinConfirm}
               onCancel={handleJoinCancel}
             />
+          )}
+
+          {/* Delete confirmation dialog */}
+          {showDeleteConfirm && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/30">
+              <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm mx-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Supprimer le modele ?
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Cette action est irreversible. Le modele semantique et toutes ses relations seront supprimees.
+                </p>
+                <div className="flex justify-end gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDeleteConfirm(false)}
+                    disabled={isDeleting}
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="mr-2 h-4 w-4" />
+                    )}
+                    Supprimer
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Join configuration panel for editing existing edges */}

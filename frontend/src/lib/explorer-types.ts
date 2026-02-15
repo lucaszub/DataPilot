@@ -34,13 +34,23 @@ export function sanitizeViewName(name: string): string {
   return name.replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 128);
 }
 
-/** Infer column role from DuckDB type */
-function inferRole(type: string, nodeRole?: string): 'dimension' | 'measure' | 'key' {
-  if (nodeRole === 'dimension' || nodeRole === 'measure' || nodeRole === 'key') {
+const NUMERIC_TYPES = ['DOUBLE', 'FLOAT', 'DECIMAL', 'INTEGER', 'BIGINT', 'SMALLINT', 'TINYINT', 'HUGEINT'];
+
+/** Infer column role from name + DuckDB type.
+ *  Explicit 'measure' or 'key' from semantic layer is trusted.
+ *  'dimension' is re-evaluated (old models had all cols as dimension). */
+function inferRole(name: string, type: string, nodeRole?: string): 'dimension' | 'measure' | 'key' {
+  // Trust explicit measure/key from semantic layer
+  if (nodeRole === 'measure' || nodeRole === 'key') {
     return nodeRole;
   }
-  const t = type.toUpperCase();
-  if (['DOUBLE', 'FLOAT', 'DECIMAL', 'INTEGER', 'BIGINT', 'SMALLINT', 'TINYINT', 'HUGEINT'].includes(t)) {
+  // ID columns are always dimensions
+  const lower = name.toLowerCase();
+  if (lower.endsWith('_id') || lower === 'id') {
+    return 'dimension';
+  }
+  // Numeric columns default to measure
+  if (NUMERIC_TYPES.includes(type.toUpperCase())) {
     return 'measure';
   }
   return 'dimension';
@@ -61,7 +71,7 @@ export function buildTablesFromSemanticLayer(
       // Use semantic layer column roles if available, fall back to schema_cache
       const columns: ColumnDef[] = ds.schema_cache.columns.map(schemaCol => {
         const nodeCol = node.columns?.find(c => c.name === schemaCol.name);
-        const role = nodeCol?.role === 'ignore' ? 'dimension' : inferRole(schemaCol.type, nodeCol?.role);
+        const role = nodeCol?.role === 'ignore' ? 'dimension' : inferRole(schemaCol.name, schemaCol.type, nodeCol?.role);
         return {
           name: schemaCol.name,
           type: schemaCol.type,
