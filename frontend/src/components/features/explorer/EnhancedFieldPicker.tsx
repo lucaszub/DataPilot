@@ -3,15 +3,21 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, ChevronRight, ChevronDown, Database, Check, BarChart3, Calendar, Hash, Type, TrendingUp, Filter, ArrowUpDown, Calculator, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { mockTables } from '@/lib/mock-data/schema';
-import { mockSavedQueries } from '@/lib/mock-data/saved-queries';
+import { api, SavedQueryResponse } from '@/lib/api';
 import { useExplorer, SelectedField, ChartType } from './ExplorerContext';
 
-const typeIcons: Record<string, React.ReactNode> = {
-  string: <Type className="h-3 w-3" />,
-  number: <Hash className="h-3 w-3" />,
-  date: <Calendar className="h-3 w-3" />,
-  boolean: <Check className="h-3 w-3" />,
+const getTypeIcon = (type: string): React.ReactNode => {
+  const upperType = type.toUpperCase();
+  if (['DOUBLE', 'FLOAT', 'INTEGER', 'BIGINT', 'SMALLINT', 'DECIMAL', 'TINYINT', 'HUGEINT'].includes(upperType)) {
+    return <Hash className="h-3 w-3" />;
+  }
+  if (['TIMESTAMP', 'DATE', 'TIME'].includes(upperType)) {
+    return <Calendar className="h-3 w-3" />;
+  }
+  if (upperType === 'BOOLEAN') {
+    return <Check className="h-3 w-3" />;
+  }
+  return <Type className="h-3 w-3" />;
 };
 
 const chartTypeLabels: Record<ChartType, string> = {
@@ -34,14 +40,31 @@ interface ContextMenuState {
 }
 
 export function EnhancedFieldPicker() {
-  const { state, dispatch } = useExplorer();
+  const { state, dispatch, tables, workspaceId } = useExplorer();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set(['customers', 'orders']));
   const [showSavedQueries, setShowSavedQueries] = useState(false);
+  const [savedQueries, setSavedQueries] = useState<SavedQueryResponse[]>([]);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false, x: 0, y: 0, tableName: '', columnName: '', columnType: '', role: 'dimension',
   });
   const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  // Load saved queries
+  useEffect(() => {
+    if (!workspaceId) return;
+
+    const loadQueries = async () => {
+      try {
+        const queries = await api.queries.listSaved(workspaceId);
+        setSavedQueries(queries);
+      } catch (error) {
+        console.error('Failed to load saved queries:', error);
+      }
+    };
+
+    loadQueries();
+  }, [workspaceId]);
 
   // Close context menu on outside click
   useEffect(() => {
@@ -137,13 +160,13 @@ export function EnhancedFieldPicker() {
       type: columnType,
       role,
       aggregation: role === 'measure' ? 'SUM' : 'none',
-      dateGranularity: columnType === 'date' ? 'month' : 'raw',
+      dateGranularity: ['TIMESTAMP', 'DATE', 'TIME'].includes(columnType.toUpperCase()) ? 'month' : 'raw',
     };
     dispatch({ type: 'ADD_FIELD', field });
   };
 
   const addAllDimensions = (tableName: string) => {
-    const table = mockTables.find(t => t.name === tableName);
+    const table = tables.find(t => t.name === tableName);
     if (!table) return;
 
     table.columns
@@ -156,7 +179,7 @@ export function EnhancedFieldPicker() {
   };
 
   const addAllMeasures = (tableName: string) => {
-    const table = mockTables.find(t => t.name === tableName);
+    const table = tables.find(t => t.name === tableName);
     if (!table) return;
 
     table.columns
@@ -169,10 +192,16 @@ export function EnhancedFieldPicker() {
   };
 
   const loadSavedQuery = (queryId: string) => {
-    dispatch({ type: 'LOAD_SAVED_QUERY', queryId });
+    const query = savedQueries.find(q => q.id === queryId);
+    if (!query) return;
+    dispatch({
+      type: 'LOAD_SAVED_SQL',
+      sql: query.sql_text,
+      chartType: query.chart_type as ChartType
+    });
   };
 
-  const filteredTables = mockTables.filter(table => {
+  const filteredTables = tables.filter(table => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -253,20 +282,15 @@ export function EnhancedFieldPicker() {
                               "w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted/50 transition-colors",
                               selected && "bg-primary/10"
                             )}
-                            title={col.description || col.name}
+                            title={col.name}
                           >
                             <div className="h-2 w-2 rounded-full bg-blue-500" />
                             <div className="text-muted-foreground">
-                              {typeIcons[col.type] || typeIcons.string}
+                              {getTypeIcon(col.type)}
                             </div>
                             <span className="flex-1 text-left text-sm text-foreground">
                               {col.name}
                             </span>
-                            {col.description && (
-                              <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">
-                                {col.description}
-                              </span>
-                            )}
                             {selected && <Check className="h-4 w-4 text-primary" />}
                           </button>
                         );
@@ -299,20 +323,15 @@ export function EnhancedFieldPicker() {
                               "w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted/50 transition-colors",
                               selected && "bg-primary/10"
                             )}
-                            title={col.description || col.name}
+                            title={col.name}
                           >
                             <div className="h-2 w-2 rounded-full bg-primary" />
                             <div className="text-muted-foreground">
-                              {typeIcons[col.type] || typeIcons.number}
+                              {getTypeIcon(col.type)}
                             </div>
                             <span className="flex-1 text-left text-sm text-foreground">
                               {col.name}
                             </span>
-                            {col.description && (
-                              <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">
-                                {col.description}
-                              </span>
-                            )}
                             {selected && <Check className="h-4 w-4 text-primary" />}
                           </button>
                         );
@@ -342,13 +361,13 @@ export function EnhancedFieldPicker() {
             Requêtes sauvegardées
           </span>
           <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-            {mockSavedQueries.length}
+            {savedQueries.length}
           </span>
         </button>
 
         {showSavedQueries && (
           <div className="max-h-48 overflow-y-auto">
-            {mockSavedQueries.map(query => (
+            {savedQueries.map(query => (
               <button
                 key={query.id}
                 onClick={() => loadSavedQuery(query.id)}
@@ -360,14 +379,14 @@ export function EnhancedFieldPicker() {
                     <div className="text-sm text-foreground truncate">
                       {query.name}
                     </div>
-                    {query.description && (
-                      <div className="text-xs text-muted-foreground truncate">
-                        {query.description}
+                    {query.sql_text && (
+                      <div className="text-xs text-muted-foreground truncate font-mono">
+                        {query.sql_text.substring(0, 40)}...
                       </div>
                     )}
                   </div>
                   <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full flex-shrink-0">
-                    {chartTypeLabels[query.chartType]}
+                    {chartTypeLabels[query.chart_type as ChartType]}
                   </span>
                 </div>
               </button>

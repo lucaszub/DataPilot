@@ -4,8 +4,6 @@ import React, { useState } from 'react';
 import { Plus, X, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useExplorer, ExplorerFilter } from './ExplorerContext';
-import { mockTables } from '@/lib/mock-data/schema';
-import { getUniqueValues } from '@/lib/mock-data/query-engine';
 
 // Type helper functions to handle schema type names
 const isDateType = (type: string): boolean => {
@@ -66,10 +64,9 @@ interface FilterEditorProps {
 }
 
 function FilterEditor({ filter, onUpdate, onRemove }: FilterEditorProps) {
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const { tables } = useExplorer();
 
-  const allColumns = mockTables.flatMap(table =>
+  const allColumns = tables.flatMap(table =>
     table.columns.map(col => ({
       tableName: table.name,
       tableDisplay: table.displayName,
@@ -102,23 +99,6 @@ function FilterEditor({ filter, onUpdate, onRemove }: FilterEditorProps) {
 
   const handleValueChange = (value: string) => {
     onUpdate({ value });
-
-    // Load suggestions for string columns
-    if (selectedColumn && isStringType(selectedColumn.columnType) && value.length > 0) {
-      const values = getUniqueValues(filter.tableName, filter.column);
-      const filtered = values
-        .filter(v => String(v).toLowerCase().includes(value.toLowerCase()))
-        .slice(0, 10);
-      setSuggestions(filtered.map(String));
-      setShowSuggestions(filtered.length > 0);
-    } else {
-      setShowSuggestions(false);
-    }
-  };
-
-  const selectSuggestion = (value: string) => {
-    onUpdate({ value });
-    setShowSuggestions(false);
   };
 
   const needsSecondValue = filter.operator === 'between';
@@ -132,7 +112,7 @@ function FilterEditor({ filter, onUpdate, onRemove }: FilterEditorProps) {
         className="px-3 py-1.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
       >
         <option value="">Sélectionner un champ</option>
-        {mockTables.map(table => (
+        {tables.map(table => (
           <optgroup key={table.name} label={table.displayName}>
             {table.columns.map(col => (
               <option key={col.name} value={`${table.name}.${col.name}`}>
@@ -158,30 +138,13 @@ function FilterEditor({ filter, onUpdate, onRemove }: FilterEditorProps) {
 
       {/* Value input */}
       {!filter.operator.startsWith('last_') && !['this_month', 'last_month', 'this_quarter', 'this_year'].includes(filter.operator) && (
-        <div className="relative flex-1">
-          <input
-            type={normalizedType === 'date' ? 'date' : normalizedType === 'number' ? 'number' : 'text'}
-            value={filter.value}
-            onChange={(e) => handleValueChange(e.target.value)}
-            placeholder="Valeur..."
-            className="w-full px-3 py-1.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
-
-          {/* Suggestions dropdown */}
-          {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute z-10 mt-1 w-full bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-              {suggestions.map((suggestion, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => selectSuggestion(suggestion)}
-                  className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted/50 transition-colors"
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <input
+          type={normalizedType === 'date' ? 'date' : normalizedType === 'number' ? 'number' : 'text'}
+          value={filter.value}
+          onChange={(e) => handleValueChange(e.target.value)}
+          placeholder="Valeur..."
+          className="flex-1 px-3 py-1.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+        />
       )}
 
       {/* Second value for "between" */}
@@ -210,7 +173,7 @@ function FilterEditor({ filter, onUpdate, onRemove }: FilterEditorProps) {
 }
 
 export function EnhancedFilterPanel() {
-  const { state, dispatch } = useExplorer();
+  const { state, dispatch, tables } = useExplorer();
   const [isAddingFilter, setIsAddingFilter] = useState(false);
 
   const addFilter = () => {
@@ -264,7 +227,7 @@ export function EnhancedFilterPanel() {
     }
 
     // Find a date column to apply the filter
-    const dateColumn = mockTables
+    const dateColumn = tables
       .flatMap(t => t.columns.filter(c => isDateType(c.type)).map(c => ({ table: t.name, column: c.name })))
       [0];
 

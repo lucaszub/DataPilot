@@ -20,6 +20,7 @@ import {
 } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 import { useExplorer } from './ExplorerContext';
+import { classifyByType } from '@/lib/explorer-adapter';
 
 const COLORS = ['#FF5789', '#8B5CF6', '#3B82F6', '#F59E0B', '#10B981', '#EC4899'];
 
@@ -48,17 +49,13 @@ export function ExplorerChart() {
 
   const dimensions = useMemo(() => {
     if (!state.result) return [];
-    return state.result.columns.filter(col =>
-      state.selectedFields.find(f => f.name === col.name && f.tableName === col.tableName && f.role === 'dimension')
-    );
-  }, [state.result, state.selectedFields]);
+    return state.result.columns.filter(col => classifyByType(col.type) === 'dimension');
+  }, [state.result]);
 
   const measures = useMemo(() => {
     if (!state.result) return [];
-    return state.result.columns.filter(col =>
-      state.selectedFields.find(f => f.name === col.name && f.tableName === col.tableName && f.role === 'measure')
-    );
-  }, [state.result, state.selectedFields]);
+    return state.result.columns.filter(col => classifyByType(col.type) === 'measure');
+  }, [state.result]);
 
   const firstDimension = dimensions[0]?.name || '';
   const firstMeasure = measures[0]?.name || '';

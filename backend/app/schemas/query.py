@@ -32,14 +32,14 @@ class SavedQueryCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     sql_text: str = Field(..., min_length=1)
     workspace_id: uuid.UUID
-    chart_type: str | None = Field(default=None, pattern=r"^(bar|line|pie|kpi|table)$")
+    chart_type: str | None = Field(default=None, pattern=r"^(bar|line|pie|kpi|table|area)$")
 
 
 class SavedQueryUpdate(BaseModel):
     """Request schema for updating a saved query."""
     name: str | None = Field(default=None, min_length=1, max_length=255)
     sql_text: str | None = Field(default=None, min_length=1)
-    chart_type: str | None = Field(default=None, pattern=r"^(bar|line|pie|kpi|table)$")
+    chart_type: str | None = Field(default=None, pattern=r"^(bar|line|pie|kpi|table|area)$")
 
 
 class SavedQueryResponse(BaseModel):

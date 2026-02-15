@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { useExplorer, calcFormulaLabels } from './ExplorerContext';
 import { ColumnActionsMenu } from './ColumnActionsMenu';
 import { AddCalculatedColumnModal } from './AddCalculatedColumnModal';
-import type { ColumnInfo } from '@/lib/mock-data/query-engine';
+import type { ExplorerColumnInfo } from '@/lib/explorer-adapter';
 
 const numberFormatter = new Intl.NumberFormat('fr-FR', {
   minimumFractionDigits: 0,
@@ -48,7 +48,7 @@ function formatCellValue(value: unknown, columnType?: string): string {
 }
 
 interface ColumnMenuState {
-  column: ColumnInfo | null;
+  column: ExplorerColumnInfo | null;
   position: { x: number; y: number };
 }
 

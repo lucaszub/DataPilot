@@ -12,6 +12,7 @@ import { ExplorerToolbar } from "@/components/features/explorer/ExplorerToolbar"
 import { SqlPreviewPanel } from "@/components/features/explorer/SqlPreviewPanel";
 import { QueryHistory } from "@/components/features/explorer/QueryHistory";
 import { AskAiPanel } from "@/components/features/explorer/AskAiPanel";
+import { useExplorerData } from "@/hooks/useExplorerData";
 
 function ExplorerContent() {
   const { state } = useExplorer();
@@ -117,9 +118,113 @@ function ExplorerContent() {
 }
 
 export default function ExplorerPage() {
+  const {
+    workspaces,
+    currentWorkspaceId,
+    setCurrentWorkspaceId,
+    tables,
+    relationships,
+    isLoading,
+    error
+  } = useExplorerData();
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
+          <p className="mt-4 text-sm text-muted-foreground">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="bg-destructive/10 text-destructive rounded-lg p-6 max-w-md">
+          <h2 className="font-semibold mb-2">Erreur</h2>
+          <p className="text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // No workspace
+  if (workspaces.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center p-8">
+          <h2 className="text-lg font-semibold mb-2">Aucun workspace</h2>
+          <p className="text-sm text-muted-foreground">
+            Créez un workspace pour commencer à utiliser l'Explorer.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // No tables
+  if (tables.length === 0) {
+    return (
+      <div className="flex flex-col h-screen">
+        {workspaces.length > 1 && (
+          <div className="border-b border-border bg-card px-4 py-3">
+            <label className="text-sm font-medium mr-2">Workspace:</label>
+            <select
+              value={currentWorkspaceId || ''}
+              onChange={(e) => setCurrentWorkspaceId(e.target.value)}
+              className="border border-border rounded px-3 py-1 text-sm bg-background"
+            >
+              {workspaces.map((ws) => (
+                <option key={ws.id} value={ws.id}>
+                  {ws.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center p-8">
+            <h2 className="text-lg font-semibold mb-2">Aucune source de données</h2>
+            <p className="text-sm text-muted-foreground">
+              Ajoutez des sources de données et créez un semantic layer pour utiliser l'Explorer.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <ExplorerProvider>
-      <ExplorerContent />
-    </ExplorerProvider>
+    <div className="flex flex-col h-screen">
+      {workspaces.length > 1 && (
+        <div className="border-b border-border bg-card px-4 py-3">
+          <label className="text-sm font-medium mr-2">Workspace:</label>
+          <select
+            value={currentWorkspaceId || ''}
+            onChange={(e) => setCurrentWorkspaceId(e.target.value)}
+            className="border border-border rounded px-3 py-1 text-sm bg-background"
+          >
+            {workspaces.map((ws) => (
+              <option key={ws.id} value={ws.id}>
+                {ws.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="flex-1 overflow-hidden">
+        <ExplorerProvider
+          tables={tables}
+          relationships={relationships}
+          workspaceId={currentWorkspaceId}
+        >
+          <ExplorerContent />
+        </ExplorerProvider>
+      </div>
+    </div>
   );
 }

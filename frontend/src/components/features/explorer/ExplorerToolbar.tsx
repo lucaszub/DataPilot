@@ -40,11 +40,7 @@ const chartTypeIcons: Record<ChartType, React.ReactNode> = {
 };
 
 export function ExplorerToolbar() {
-  const { state, dispatch } = useExplorer();
-
-  const executeQuery = () => {
-    dispatch({ type: 'EXECUTE_QUERY' });
-  };
+  const { state, dispatch, executeQuery } = useExplorer();
 
   const setViewMode = (mode: ViewMode) => {
     dispatch({ type: 'SET_VIEW_MODE', mode });

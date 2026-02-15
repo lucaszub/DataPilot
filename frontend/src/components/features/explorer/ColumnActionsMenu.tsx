@@ -17,10 +17,10 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useExplorer, QuickCalcType, quickCalcLabels } from './ExplorerContext';
-import type { ColumnInfo } from '@/lib/mock-data/query-engine';
+import type { ExplorerColumnInfo } from '@/lib/explorer-adapter';
 
 interface ColumnActionsMenuProps {
-  column: ColumnInfo;
+  column: ExplorerColumnInfo;
   position: { x: number; y: number };
   onClose: () => void;
   onAddCalculatedColumn?: (preselectedColumnA: string) => void;
@@ -36,7 +36,7 @@ const quickCalcOptions: { type: QuickCalcType; icon: React.ReactNode; descriptio
 ];
 
 export function ColumnActionsMenu({ column, position, onClose, onAddCalculatedColumn }: ColumnActionsMenuProps) {
-  const { state, dispatch } = useExplorer();
+  const { state, dispatch, executeQuery } = useExplorer();
   const [showCalcSubmenu, setShowCalcSubmenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -73,7 +73,7 @@ export function ColumnActionsMenu({ column, position, onClose, onAddCalculatedCo
         direction: 'ASC',
       },
     });
-    dispatch({ type: 'EXECUTE_QUERY' });
+    executeQuery();
     onClose();
   };
 
@@ -87,7 +87,7 @@ export function ColumnActionsMenu({ column, position, onClose, onAddCalculatedCo
         direction: 'DESC',
       },
     });
-    dispatch({ type: 'EXECUTE_QUERY' });
+    executeQuery();
     onClose();
   };
 
@@ -116,7 +116,7 @@ export function ColumnActionsMenu({ column, position, onClose, onAddCalculatedCo
   const handleQuickCalc = (calcType: QuickCalcType) => {
     if (field) {
       dispatch({ type: 'UPDATE_FIELD_QUICK_CALC', fieldId: field.id, quickCalc: calcType });
-      dispatch({ type: 'EXECUTE_QUERY' });
+      executeQuery();
     }
     onClose();
   };
