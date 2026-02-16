@@ -1,17 +1,60 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, Bot, User, Copy, Check, BarChart3 } from "lucide-react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import {
+  Send,
+  Sparkles,
+  Bot,
+  User,
+  Copy,
+  Check,
+  BarChart3,
+  AlertCircle,
+  LayoutDashboard,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
+import { getAccessToken } from "@/lib/auth";
+
+// --- AI types (defined locally until api.ts exposes them) ---
+
+interface AIQueryRequest {
+  question: string;
+  workspace_id: string;
+}
+
+interface AIQueryResponse {
+  sql: string;
+  explanation: string;
+  results: {
+    columns: Array<{ name: string; type: string }>;
+    rows: Record<string, unknown>[];
+    row_count: number;
+    execution_time_ms: number;
+  };
+  suggested_chart: string | null;
+}
+
+// --- Chat types ---
 
 interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   sql?: string;
+  results?: {
+    columns: Array<{ name: string; type: string }>;
+    rows: Record<string, unknown>[];
+    row_count: number;
+    execution_time_ms: number;
+  };
+  suggestedChart?: string;
+  error?: boolean;
   timestamp: Date;
 }
+
+// --- Suggestions de demarrage ---
 
 const SUGGESTIONS = [
   "Quel est le chiffre d'affaires total par mois ?",
@@ -22,68 +65,58 @@ const SUGGESTIONS = [
   "Quel est le panier moyen par segment client ?",
 ];
 
-const MOCK_RESPONSES: Record<string, { text: string; sql: string }> = {
-  default: {
-    text: "Voici la requete SQL correspondante. Elle selectionne les donnees demandees a partir de vos tables commandes et clients.",
-    sql: `SELECT
-  DATE_TRUNC('month', o.order_date) AS mois,
-  COUNT(*) AS nb_commandes,
-  SUM(o.total_amount) AS ca_total,
-  AVG(o.total_amount) AS panier_moyen
-FROM orders o
-JOIN customers c ON o.customer_id = c.id
-GROUP BY DATE_TRUNC('month', o.order_date)
-ORDER BY mois DESC
-LIMIT 12;`,
-  },
-  clients: {
-    text: "Voici les 10 clients avec le plus gros chiffre d'affaires, avec le nombre de commandes et le montant moyen.",
-    sql: `SELECT
-  c.name AS client,
-  c.company AS entreprise,
-  c.segment,
-  COUNT(o.id) AS nb_commandes,
-  SUM(o.total_amount) AS ca_total,
-  AVG(o.total_amount) AS panier_moyen
-FROM customers c
-JOIN orders o ON c.id = o.customer_id
-GROUP BY c.id, c.name, c.company, c.segment
-ORDER BY ca_total DESC
-LIMIT 10;`,
-  },
-  statut: {
-    text: "Voici la repartition des commandes par statut avec les montants associes.",
-    sql: `SELECT
-  status AS statut,
-  COUNT(*) AS nb_commandes,
-  SUM(total_amount) AS montant_total,
-  ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 1) AS pourcentage
-FROM orders
-GROUP BY status
-ORDER BY nb_commandes DESC;`,
-  },
-  marge: {
-    text: "Voici l'analyse des marges par produit, triee par marge la plus elevee.",
-    sql: `SELECT
-  p.name AS produit,
-  p.category AS categorie,
-  p.unit_price AS prix_vente,
-  p.cost_price AS prix_revient,
-  (p.unit_price - p.cost_price) AS marge_unitaire,
-  ROUND((p.unit_price - p.cost_price) / p.unit_price * 100, 1) AS marge_pct
-FROM products p
-WHERE p.unit_price > 0
-ORDER BY marge_pct DESC
-LIMIT 15;`,
-  },
+// --- Chart type labels ---
+
+const CHART_LABELS: Record<string, string> = {
+  bar: "Barres",
+  line: "Ligne",
+  pie: "Camembert",
+  kpi: "KPI",
+  table: "Tableau",
 };
 
-function getMockResponse(query: string): { text: string; sql: string } {
-  const lower = query.toLowerCase();
-  if (lower.includes("client") || lower.includes("meilleur")) return MOCK_RESPONSES.clients;
-  if (lower.includes("statut") || lower.includes("repartition")) return MOCK_RESPONSES.statut;
-  if (lower.includes("marge") || lower.includes("produit")) return MOCK_RESPONSES.marge;
-  return MOCK_RESPONSES.default;
+// --- API call helper (uses auth token, not in api.ts yet) ---
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+async function queryAI(payload: AIQueryRequest): Promise<AIQueryResponse> {
+  const token = getAccessToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}/api/v1/ai/query`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    if (response.status === 503) {
+      throw new Error(
+        "Le service IA n'est pas disponible pour le moment. Verifiez que la cle API Anthropic est configuree."
+      );
+    }
+    let errorMessage = `Erreur ${response.status}`;
+    try {
+      const errorData = (await response.json()) as { detail?: string };
+      if (errorData.detail) {
+        errorMessage =
+          typeof errorData.detail === "string"
+            ? errorData.detail
+            : JSON.stringify(errorData.detail);
+      }
+    } catch {
+      // ignore JSON parse errors
+    }
+    throw new Error(errorMessage);
+  }
+
+  return response.json() as Promise<AIQueryResponse>;
 }
 
 export default function ChatPage() {
@@ -91,47 +124,113 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load first workspace on mount
+  useEffect(() => {
+    async function loadWorkspace() {
+      try {
+        const workspaces = await api.workspaces.list();
+        if (workspaces.length > 0) {
+          setWorkspaceId(workspaces[0].id);
+        } else {
+          setWorkspaceError(
+            "Aucun workspace trouve. Creez un workspace pour utiliser le chat IA."
+          );
+        }
+      } catch {
+        setWorkspaceError(
+          "Impossible de charger les workspaces. Verifiez votre connexion."
+        );
+      }
+    }
+    loadWorkspace();
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  function handleSend(text?: string) {
-    const query = text || input.trim();
-    if (!query || isTyping) return;
+  const handleSend = useCallback(
+    async function handleSend(text?: string) {
+      const query = text || input.trim();
+      if (!query || isTyping) return;
 
-    const userMsg: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      role: "user",
-      content: query,
-      timestamp: new Date(),
-    };
+      if (!workspaceId) {
+        const errorMsg: ChatMessage = {
+          id: `msg-${Date.now()}-err`,
+          role: "assistant",
+          content:
+            workspaceError ||
+            "Aucun workspace disponible. Creez un workspace pour continuer.",
+          error: true,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, errorMsg]);
+        return;
+      }
 
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setIsTyping(true);
-
-    // Simulate AI response delay
-    setTimeout(() => {
-      const response = getMockResponse(query);
-      const assistantMsg: ChatMessage = {
-        id: `msg-${Date.now()}-ai`,
-        role: "assistant",
-        content: response.text,
-        sql: response.sql,
+      const userMsg: ChatMessage = {
+        id: `msg-${Date.now()}`,
+        role: "user",
+        content: query,
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, assistantMsg]);
-      setIsTyping(false);
-    }, 1200 + Math.random() * 800);
-  }
+
+      setMessages((prev) => [...prev, userMsg]);
+      setInput("");
+      setIsTyping(true);
+
+      try {
+        const response = await queryAI({
+          question: query,
+          workspace_id: workspaceId,
+        });
+
+        const assistantMsg: ChatMessage = {
+          id: `msg-${Date.now()}-ai`,
+          role: "assistant",
+          content: response.explanation,
+          sql: response.sql,
+          results: response.results,
+          suggestedChart: response.suggested_chart ?? undefined,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : "Une erreur inattendue est survenue.";
+
+        const errorMsg: ChatMessage = {
+          id: `msg-${Date.now()}-err`,
+          role: "assistant",
+          content: errorMessage,
+          error: true,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, errorMsg]);
+      } finally {
+        setIsTyping(false);
+      }
+    },
+    [input, isTyping, workspaceId, workspaceError]
+  );
 
   function handleCopy(sql: string, msgId: string) {
     navigator.clipboard.writeText(sql);
     setCopiedId(msgId);
     setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  function handleCopyToDashboard(sql: string, msgId: string) {
+    navigator.clipboard.writeText(sql);
+    setCopiedId(`dash-${msgId}`);
+    setTimeout(() => setCopiedId(null), 2500);
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -157,6 +256,14 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
+
+      {/* Workspace error banner */}
+      {workspaceError && (
+        <div className="px-6 py-3 bg-destructive/10 border-b border-destructive/20 flex items-center gap-2 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          {workspaceError}
+        </div>
+      )}
 
       {/* Messages Area */}
       <div className="flex-1 overflow-auto px-6 py-4 space-y-4">
@@ -201,11 +308,15 @@ export default function ChatPage() {
                 "flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center",
                 msg.role === "user"
                   ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
+                  : msg.error
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-muted text-muted-foreground"
               )}
             >
               {msg.role === "user" ? (
                 <User className="h-4 w-4" />
+              ) : msg.error ? (
+                <AlertCircle className="h-4 w-4" />
               ) : (
                 <Bot className="h-4 w-4" />
               )}
@@ -215,10 +326,16 @@ export default function ChatPage() {
                 "rounded-xl px-4 py-3 max-w-[85%]",
                 msg.role === "user"
                   ? "bg-primary text-primary-foreground"
-                  : "bg-card border border-border"
+                  : msg.error
+                    ? "bg-destructive/10 border border-destructive/20"
+                    : "bg-card border border-border"
               )}
             >
-              <p className="text-sm">{msg.content}</p>
+              <p className={cn("text-sm", msg.error && "text-destructive")}>
+                {msg.content}
+              </p>
+
+              {/* SQL block */}
               {msg.sql && (
                 <div className="mt-3 rounded-lg bg-gray-950 dark:bg-gray-900 p-3 relative group">
                   <button
@@ -234,6 +351,79 @@ export default function ChatPage() {
                   <pre className="text-xs text-gray-300 overflow-x-auto whitespace-pre font-mono">
                     {msg.sql}
                   </pre>
+                </div>
+              )}
+
+              {/* Results table */}
+              {msg.results && msg.results.rows.length > 0 && (
+                <div className="mt-3 rounded-lg border overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted">
+                      <tr>
+                        {msg.results.columns.map((col) => (
+                          <th
+                            key={col.name}
+                            className="px-3 py-2 text-left font-medium"
+                          >
+                            {col.name}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {msg.results.rows.slice(0, 5).map((row, i) => (
+                        <tr key={i} className="border-t">
+                          {msg.results!.columns.map((col) => (
+                            <td key={col.name} className="px-3 py-1.5">
+                              {String(row[col.name] ?? "")}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {msg.results.row_count > 5 && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground bg-muted/50">
+                      + {msg.results.row_count - 5} lignes supplementaires
+                    </div>
+                  )}
+                  <div className="px-3 py-1.5 text-xs text-muted-foreground bg-muted/30 border-t">
+                    {msg.results.row_count} resultats en{" "}
+                    {msg.results.execution_time_ms}ms
+                  </div>
+                </div>
+              )}
+
+              {/* Suggested chart badge + Add to dashboard button */}
+              {(msg.suggestedChart || (msg.results && msg.sql)) && (
+                <div className="mt-3 flex items-center gap-2 flex-wrap">
+                  {msg.suggestedChart && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                      <BarChart3 className="h-3 w-3" />
+                      {CHART_LABELS[msg.suggestedChart] ||
+                        msg.suggestedChart}
+                    </span>
+                  )}
+                  {msg.sql && msg.results && (
+                    <button
+                      onClick={() =>
+                        handleCopyToDashboard(msg.sql!, msg.id)
+                      }
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {copiedId === `dash-${msg.id}` ? (
+                        <>
+                          <Check className="h-3 w-3" />
+                          SQL copie — creez un widget dans le dashboard
+                        </>
+                      ) : (
+                        <>
+                          <LayoutDashboard className="h-3 w-3" />
+                          Ajouter au dashboard
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

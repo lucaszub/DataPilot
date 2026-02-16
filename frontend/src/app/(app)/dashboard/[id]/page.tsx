@@ -1,16 +1,17 @@
 "use client"
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { Lock, Unlock, Maximize2, Plus } from 'lucide-react';
+import { Lock, Unlock, Maximize2, Plus, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { GlobalFilters, type DashboardFilters } from '@/components/features/dashboard/GlobalFilters';
 import { ThemeSelector } from '@/components/features/dashboard/ThemeSelector';
 import { DashboardWidget } from '@/components/features/dashboard/DashboardWidget';
 import { WidgetCreationPanel } from '@/components/features/dashboard/WidgetCreationPanel';
-import { getDashboardById, type DashboardWidget as DashboardWidgetType } from '@/lib/mock-data/dashboards';
+import { api, type DashboardWithWidgets, type DashboardWidget as ApiWidget } from '@/lib/api';
+import { getDashboardById, type DashboardWidget as MockWidgetType } from '@/lib/mock-data/dashboards';
 
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
@@ -19,23 +20,108 @@ import 'react-resizable/css/styles.css';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactGridLayout = dynamic(() => import('react-grid-layout'), { ssr: false }) as any;
 
+/**
+ * Convert an API widget to the mock widget shape expected by existing components.
+ */
+function apiWidgetToMock(w: ApiWidget): MockWidgetType {
+  const configJson = (w.config_json || {}) as Record<string, unknown>;
+  return {
+    id: w.id,
+    type: w.type,
+    title: w.title,
+    chartType: (w.chart_type as MockWidgetType['chartType']) || undefined,
+    savedQueryId: w.saved_query_id || undefined,
+    kpiValue: configJson.kpiValue as string | number | undefined,
+    kpiLabel: configJson.kpiLabel as string | undefined,
+    kpiTrend: configJson.kpiTrend as number | undefined,
+    kpiTrendDirection: configJson.kpiTrendDirection as 'up' | 'down' | undefined,
+    data: configJson.data as Record<string, unknown>[] | undefined,
+    layout: w.position || { x: 0, y: 0, w: 6, h: 4 },
+  };
+}
+
+/**
+ * Convert a mock widget (from the creation panel) to the API WidgetCreate shape.
+ */
+function mockWidgetToApiCreate(w: Partial<MockWidgetType>) {
+  const config: Record<string, unknown> = {};
+  if (w.kpiValue !== undefined) config.kpiValue = w.kpiValue;
+  if (w.kpiLabel !== undefined) config.kpiLabel = w.kpiLabel;
+  if (w.kpiTrend !== undefined) config.kpiTrend = w.kpiTrend;
+  if (w.kpiTrendDirection !== undefined) config.kpiTrendDirection = w.kpiTrendDirection;
+  if (w.data !== undefined) config.data = w.data;
+
+  return {
+    type: w.type!,
+    title: w.title!,
+    chart_type: w.chartType || undefined,
+    saved_query_id: w.savedQueryId || undefined,
+    config_json: Object.keys(config).length > 0 ? config : undefined,
+    position: w.layout ? { x: w.layout.x, y: w.layout.y, w: w.layout.w, h: w.layout.h } : undefined,
+  };
+}
+
 export default function DashboardDetailPage() {
   const params = useParams();
   const dashboardId = params.id as string;
 
-  const [dashboard, setDashboard] = useState(() => getDashboardById(dashboardId));
+  // State
+  const [isLoading, setIsLoading] = useState(true);
+  const [isMock, setIsMock] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardWithWidgets | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [dashboardName, setDashboardName] = useState(dashboard?.name || '');
-  const [theme, setTheme] = useState(dashboard?.theme || 'classic');
+  const [dashboardName, setDashboardName] = useState('');
+  const [theme, setTheme] = useState('classic');
   const [filters, setFilters] = useState<DashboardFilters>({
     dateRange: 'all',
     segment: 'all',
     category: 'all',
   });
-  const [widgets, setWidgets] = useState<DashboardWidgetType[]>(dashboard?.widgets || []);
+  const [widgets, setWidgets] = useState<MockWidgetType[]>([]);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [containerWidth, setContainerWidth] = useState(1200);
+
+  // Debounce timer for layout updates
+  const layoutUpdateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Load dashboard
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const data = await api.dashboards.getById(dashboardId);
+        if (cancelled) return;
+        setDashboardData(data);
+        setDashboardName(data.name);
+        setTheme(data.theme || 'classic');
+        setWidgets(data.widgets.map(apiWidgetToMock));
+        setIsMock(false);
+      } catch {
+        if (cancelled) return;
+        // Fallback to mock data
+        const mock = getDashboardById(dashboardId);
+        if (mock) {
+          setDashboardName(mock.name);
+          setTheme(mock.theme);
+          setWidgets(mock.widgets);
+          setIsMock(true);
+        } else {
+          setDashboardData(null);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [dashboardId]);
 
   // Update container width on mount and resize
   useEffect(() => {
@@ -51,30 +137,37 @@ export default function DashboardDetailPage() {
     return () => window.removeEventListener('resize', updateWidth);
   }, []);
 
-  if (!dashboard) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-2">Tableau de bord introuvable</h2>
-          <p className="text-muted-foreground">Le tableau de bord demandé n&apos;existe pas.</p>
-        </div>
-      </div>
-    );
-  }
+  // --- API persistence helpers ---
 
-  // Convert widgets to layout format
-  const layout = widgets.map((widget) => ({
-    i: widget.id,
-    x: widget.layout.x,
-    y: widget.layout.y,
-    w: widget.layout.w,
-    h: widget.layout.h,
-  }));
+  const persistWidgetPosition = useCallback(
+    (widgetId: string, position: { x: number; y: number; w: number; h: number }) => {
+      if (isMock || !dashboardData) return;
+      // Fire and forget -- debounced in handleLayoutChange
+      api.dashboards.updateWidget(dashboardId, widgetId, { position }).catch(() => {
+        // Silent fail -- user can retry
+      });
+    },
+    [isMock, dashboardData, dashboardId]
+  );
 
+  const persistDashboardUpdate = useCallback(
+    (data: { name?: string; theme?: string }) => {
+      if (isMock || !dashboardData) return;
+      api.dashboards.update(dashboardId, data).catch(() => {
+        // Silent fail
+      });
+    },
+    [isMock, dashboardData, dashboardId]
+  );
+
+  // --- Event handlers ---
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleLayoutChange = (newLayout: any) => {
     if (!isEditing) return;
 
     const updatedWidgets = widgets.map((widget) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const layoutItem = newLayout.find((item: any) => item.i === widget.id);
       if (layoutItem) {
         return {
@@ -91,51 +184,119 @@ export default function DashboardDetailPage() {
     });
 
     setWidgets(updatedWidgets);
+
+    // Debounced persist to API
+    if (layoutUpdateTimer.current) {
+      clearTimeout(layoutUpdateTimer.current);
+    }
+    layoutUpdateTimer.current = setTimeout(() => {
+      updatedWidgets.forEach((w) => {
+        persistWidgetPosition(w.id, w.layout);
+      });
+    }, 500);
   };
 
-  const handleRemoveWidget = (widgetId: string) => {
-    setWidgets(widgets.filter((w) => w.id !== widgetId));
+  const handleRemoveWidget = async (widgetId: string) => {
+    setWidgets((prev) => prev.filter((w) => w.id !== widgetId));
+
+    if (!isMock && dashboardData) {
+      try {
+        await api.dashboards.deleteWidget(dashboardId, widgetId);
+      } catch {
+        // Re-add on failure? For now, silent fail.
+      }
+    }
   };
 
-  const handleDuplicateWidget = (widgetId: string) => {
+  const handleDuplicateWidget = async (widgetId: string) => {
     const widget = widgets.find((w) => w.id === widgetId);
     if (!widget) return;
 
-    const newWidget: DashboardWidgetType = {
-      ...widget,
-      id: `w-${Date.now()}`,
-      title: `${widget.title} (copie)`,
-      layout: {
-        ...widget.layout,
-        y: widget.layout.y + widget.layout.h, // Place below original
-      },
-    };
-
-    setWidgets([...widgets, newWidget]);
+    if (!isMock && dashboardData) {
+      try {
+        const created = await api.dashboards.addWidget(
+          dashboardId,
+          mockWidgetToApiCreate({
+            ...widget,
+            title: `${widget.title} (copie)`,
+            layout: {
+              ...widget.layout,
+              y: widget.layout.y + widget.layout.h,
+            },
+          })
+        );
+        setWidgets((prev) => [...prev, apiWidgetToMock(created)]);
+      } catch {
+        // Fallback to local-only
+        const newWidget: MockWidgetType = {
+          ...widget,
+          id: `w-${Date.now()}`,
+          title: `${widget.title} (copie)`,
+          layout: {
+            ...widget.layout,
+            y: widget.layout.y + widget.layout.h,
+          },
+        };
+        setWidgets((prev) => [...prev, newWidget]);
+      }
+    } else {
+      const newWidget: MockWidgetType = {
+        ...widget,
+        id: `w-${Date.now()}`,
+        title: `${widget.title} (copie)`,
+        layout: {
+          ...widget.layout,
+          y: widget.layout.y + widget.layout.h,
+        },
+      };
+      setWidgets((prev) => [...prev, newWidget]);
+    }
   };
 
-  const handleAddWidget = (newWidget: Partial<DashboardWidgetType>) => {
-    // Find the first available position
+  const handleAddWidget = async (newWidgetPartial: Partial<MockWidgetType>) => {
     const maxY = widgets.reduce((max, w) => Math.max(max, w.layout.y + w.layout.h), 0);
 
-    const widget: DashboardWidgetType = {
-      id: newWidget.id!,
-      type: newWidget.type!,
-      title: newWidget.title!,
-      chartType: newWidget.chartType,
-      savedQueryId: newWidget.savedQueryId,
-      kpiValue: newWidget.kpiValue,
-      kpiLabel: newWidget.kpiLabel,
-      kpiTrend: newWidget.kpiTrend,
-      kpiTrendDirection: newWidget.kpiTrendDirection,
-      data: newWidget.data,
+    const localWidget: MockWidgetType = {
+      id: newWidgetPartial.id || `w-${Date.now()}`,
+      type: newWidgetPartial.type!,
+      title: newWidgetPartial.title!,
+      chartType: newWidgetPartial.chartType,
+      savedQueryId: newWidgetPartial.savedQueryId,
+      kpiValue: newWidgetPartial.kpiValue,
+      kpiLabel: newWidgetPartial.kpiLabel,
+      kpiTrend: newWidgetPartial.kpiTrend,
+      kpiTrendDirection: newWidgetPartial.kpiTrendDirection,
+      data: newWidgetPartial.data,
       layout: {
-        ...newWidget.layout!,
+        ...(newWidgetPartial.layout || { x: 0, y: 0, w: 6, h: 4 }),
         y: maxY,
       },
     };
 
-    setWidgets([...widgets, widget]);
+    if (!isMock && dashboardData) {
+      try {
+        const created = await api.dashboards.addWidget(
+          dashboardId,
+          mockWidgetToApiCreate(localWidget)
+        );
+        setWidgets((prev) => [...prev, apiWidgetToMock(created)]);
+      } catch {
+        // Fallback to local-only widget
+        setWidgets((prev) => [...prev, localWidget]);
+      }
+    } else {
+      setWidgets((prev) => [...prev, localWidget]);
+    }
+  };
+
+  const handleTitleBlur = () => {
+    setIsEditingTitle(false);
+    persistDashboardUpdate({ name: dashboardName });
+  };
+
+  const handleThemeChange = (newTheme: string) => {
+    setTheme(newTheme);
+    persistDashboardUpdate({ theme: newTheme });
   };
 
   const toggleFullscreen = () => {
@@ -145,6 +306,36 @@ export default function DashboardDetailPage() {
       document.exitFullscreen();
     }
   };
+
+  // Convert widgets to layout format
+  const layout = widgets.map((widget) => ({
+    i: widget.id,
+    x: widget.layout.x,
+    y: widget.layout.y,
+    w: widget.layout.w,
+    h: widget.layout.h,
+  }));
+
+  // --- Render ---
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!dashboardData && !isMock) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2">Tableau de bord introuvable</h2>
+          <p className="text-muted-foreground">Le tableau de bord demande n&apos;existe pas.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -157,9 +348,9 @@ export default function DashboardDetailPage() {
               <Input
                 value={dashboardName}
                 onChange={(e) => setDashboardName(e.target.value)}
-                onBlur={() => setIsEditingTitle(false)}
+                onBlur={handleTitleBlur}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') setIsEditingTitle(false);
+                  if (e.key === 'Enter') handleTitleBlur();
                 }}
                 autoFocus
                 className="max-w-md"
@@ -172,11 +363,16 @@ export default function DashboardDetailPage() {
                 {dashboardName}
               </h1>
             )}
+            {isMock && (
+              <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                mode demo
+              </span>
+            )}
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-3">
-            <ThemeSelector currentTheme={theme} onThemeChange={setTheme} />
+            <ThemeSelector currentTheme={theme} onThemeChange={handleThemeChange} />
 
             <Button
               variant="outline"
@@ -186,12 +382,12 @@ export default function DashboardDetailPage() {
               {isEditing ? (
                 <>
                   <Unlock className="h-4 w-4 mr-2" />
-                  Mode édition
+                  Mode edition
                 </>
               ) : (
                 <>
                   <Lock className="h-4 w-4 mr-2" />
-                  Verrouillé
+                  Verrouille
                 </>
               )}
             </Button>
@@ -205,6 +401,14 @@ export default function DashboardDetailPage() {
         {/* Global Filters */}
         <GlobalFilters onFilterChange={setFilters} />
       </div>
+
+      {/* Error */}
+      {error && (
+        <div className="mx-6 mt-4 flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {error}
+        </div>
+      )}
 
       {/* Grid Area */}
       <div id="grid-container" className="flex-1 overflow-auto p-6 bg-muted/30">

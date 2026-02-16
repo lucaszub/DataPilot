@@ -523,12 +523,156 @@ const queriesApi = {
   },
 };
 
+// --- Dashboard Types ---
+
+export interface DashboardWidget {
+  id: string;
+  dashboard_id: string;
+  type: 'kpi' | 'chart' | 'table' | 'text';
+  title: string;
+  chart_type: string | null;
+  saved_query_id: string | null;
+  config_json: Record<string, unknown> | null;
+  position: { x: number; y: number; w: number; h: number } | null;
+  created_at: string;
+}
+
+export interface DashboardResponse {
+  id: string;
+  tenant_id: string;
+  workspace_id: string;
+  name: string;
+  description: string | null;
+  theme: string;
+  layout_json: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface DashboardWithWidgets extends DashboardResponse {
+  widgets: DashboardWidget[];
+}
+
+export interface DashboardCreate {
+  workspace_id: string;
+  name: string;
+  description?: string;
+  theme?: string;
+}
+
+export interface DashboardUpdate {
+  name?: string;
+  description?: string;
+  theme?: string;
+  layout_json?: Record<string, unknown>;
+}
+
+export interface WidgetCreate {
+  type: 'kpi' | 'chart' | 'table' | 'text';
+  title: string;
+  chart_type?: string;
+  saved_query_id?: string;
+  config_json?: Record<string, unknown>;
+  position?: { x: number; y: number; w: number; h: number };
+}
+
+export interface WidgetUpdate {
+  title?: string;
+  chart_type?: string;
+  config_json?: Record<string, unknown>;
+  position?: { x: number; y: number; w: number; h: number };
+}
+
+// --- Dashboards API ---
+
+const dashboardsApi = {
+  list(skip = 0, limit = 100): Promise<DashboardResponse[]> {
+    return request<DashboardResponse[]>(
+      `/api/v1/dashboards/?skip=${skip}&limit=${limit}`
+    );
+  },
+
+  getById(id: string): Promise<DashboardWithWidgets> {
+    return request<DashboardWithWidgets>(`/api/v1/dashboards/${id}`);
+  },
+
+  create(data: DashboardCreate): Promise<DashboardResponse> {
+    return request<DashboardResponse>('/api/v1/dashboards/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  update(id: string, data: DashboardUpdate): Promise<DashboardResponse> {
+    return request<DashboardResponse>(`/api/v1/dashboards/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  delete(id: string): Promise<void> {
+    return request<void>(`/api/v1/dashboards/${id}`, { method: 'DELETE' });
+  },
+
+  addWidget(dashboardId: string, data: WidgetCreate): Promise<DashboardWidget> {
+    return request<DashboardWidget>(`/api/v1/dashboards/${dashboardId}/widgets`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateWidget(dashboardId: string, widgetId: string, data: WidgetUpdate): Promise<DashboardWidget> {
+    return request<DashboardWidget>(`/api/v1/dashboards/${dashboardId}/widgets/${widgetId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteWidget(dashboardId: string, widgetId: string): Promise<void> {
+    return request<void>(`/api/v1/dashboards/${dashboardId}/widgets/${widgetId}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// --- AI Types ---
+
+export interface AIQueryRequest {
+  question: string;
+  workspace_id: string;
+}
+
+export interface AIQueryResponse {
+  sql: string;
+  explanation: string;
+  results: {
+    columns: Array<{ name: string; type: string }>;
+    rows: Record<string, unknown>[];
+    row_count: number;
+    execution_time_ms: number;
+  };
+  suggested_chart: string | null;
+}
+
+// --- AI API ---
+
+const aiApi = {
+  query(data: AIQueryRequest): Promise<AIQueryResponse> {
+    return request<AIQueryResponse>('/api/v1/ai/query', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+};
+
 export const api = {
   auth: authApi,
   workspaces: workspacesApi,
   dataSources: dataSourcesApi,
   semanticLayers: semanticLayersApi,
   queries: queriesApi,
+  dashboards: dashboardsApi,
+  ai: aiApi,
 };
 
 // Keep backward-compatible export for any existing usage
