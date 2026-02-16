@@ -11,7 +11,7 @@ import { ThemeSelector } from '@/components/features/dashboard/ThemeSelector';
 import { DashboardWidget } from '@/components/features/dashboard/DashboardWidget';
 import { WidgetCreationPanel } from '@/components/features/dashboard/WidgetCreationPanel';
 import { api, type DashboardWithWidgets, type DashboardWidget as ApiWidget } from '@/lib/api';
-import { getDashboardById, type DashboardWidget as MockWidgetType } from '@/lib/mock-data/dashboards';
+import type { DashboardWidget as MockWidgetType } from '@/lib/mock-data/dashboards';
 
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
@@ -67,7 +67,6 @@ export default function DashboardDetailPage() {
 
   // State
   const [isLoading, setIsLoading] = useState(true);
-  const [isMock, setIsMock] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardWithWidgets | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -101,19 +100,10 @@ export default function DashboardDetailPage() {
         setDashboardName(data.name);
         setTheme(data.theme || 'classic');
         setWidgets(data.widgets.map(apiWidgetToMock));
-        setIsMock(false);
       } catch {
         if (cancelled) return;
-        // Fallback to mock data
-        const mock = getDashboardById(dashboardId);
-        if (mock) {
-          setDashboardName(mock.name);
-          setTheme(mock.theme);
-          setWidgets(mock.widgets);
-          setIsMock(true);
-        } else {
-          setDashboardData(null);
-        }
+        setError('Impossible de charger le tableau de bord.');
+        setDashboardData(null);
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -141,23 +131,23 @@ export default function DashboardDetailPage() {
 
   const persistWidgetPosition = useCallback(
     (widgetId: string, position: { x: number; y: number; w: number; h: number }) => {
-      if (isMock || !dashboardData) return;
+      if (!dashboardData) return;
       // Fire and forget -- debounced in handleLayoutChange
       api.dashboards.updateWidget(dashboardId, widgetId, { position }).catch(() => {
         // Silent fail -- user can retry
       });
     },
-    [isMock, dashboardData, dashboardId]
+    [dashboardData, dashboardId]
   );
 
   const persistDashboardUpdate = useCallback(
     (data: { name?: string; theme?: string }) => {
-      if (isMock || !dashboardData) return;
+      if (!dashboardData) return;
       api.dashboards.update(dashboardId, data).catch(() => {
         // Silent fail
       });
     },
-    [isMock, dashboardData, dashboardId]
+    [dashboardData, dashboardId]
   );
 
   // --- Event handlers ---
@@ -199,11 +189,11 @@ export default function DashboardDetailPage() {
   const handleRemoveWidget = async (widgetId: string) => {
     setWidgets((prev) => prev.filter((w) => w.id !== widgetId));
 
-    if (!isMock && dashboardData) {
+    if (dashboardData) {
       try {
         await api.dashboards.deleteWidget(dashboardId, widgetId);
       } catch {
-        // Re-add on failure? For now, silent fail.
+        // Silent fail
       }
     }
   };
@@ -212,7 +202,7 @@ export default function DashboardDetailPage() {
     const widget = widgets.find((w) => w.id === widgetId);
     if (!widget) return;
 
-    if (!isMock && dashboardData) {
+    if (dashboardData) {
       try {
         const created = await api.dashboards.addWidget(
           dashboardId,
@@ -226,31 +216,22 @@ export default function DashboardDetailPage() {
           })
         );
         setWidgets((prev) => [...prev, apiWidgetToMock(created)]);
+        return;
       } catch {
         // Fallback to local-only
-        const newWidget: MockWidgetType = {
-          ...widget,
-          id: `w-${Date.now()}`,
-          title: `${widget.title} (copie)`,
-          layout: {
-            ...widget.layout,
-            y: widget.layout.y + widget.layout.h,
-          },
-        };
-        setWidgets((prev) => [...prev, newWidget]);
       }
-    } else {
-      const newWidget: MockWidgetType = {
-        ...widget,
-        id: `w-${Date.now()}`,
-        title: `${widget.title} (copie)`,
-        layout: {
-          ...widget.layout,
-          y: widget.layout.y + widget.layout.h,
-        },
-      };
-      setWidgets((prev) => [...prev, newWidget]);
     }
+
+    const newWidget: MockWidgetType = {
+      ...widget,
+      id: `w-${Date.now()}`,
+      title: `${widget.title} (copie)`,
+      layout: {
+        ...widget.layout,
+        y: widget.layout.y + widget.layout.h,
+      },
+    };
+    setWidgets((prev) => [...prev, newWidget]);
   };
 
   const handleAddWidget = async (newWidgetPartial: Partial<MockWidgetType>) => {
@@ -273,20 +254,20 @@ export default function DashboardDetailPage() {
       },
     };
 
-    if (!isMock && dashboardData) {
+    if (dashboardData) {
       try {
         const created = await api.dashboards.addWidget(
           dashboardId,
           mockWidgetToApiCreate(localWidget)
         );
         setWidgets((prev) => [...prev, apiWidgetToMock(created)]);
+        return;
       } catch {
         // Fallback to local-only widget
-        setWidgets((prev) => [...prev, localWidget]);
       }
-    } else {
-      setWidgets((prev) => [...prev, localWidget]);
     }
+
+    setWidgets((prev) => [...prev, localWidget]);
   };
 
   const handleTitleBlur = () => {
@@ -326,7 +307,7 @@ export default function DashboardDetailPage() {
     );
   }
 
-  if (!dashboardData && !isMock) {
+  if (!dashboardData) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
@@ -362,11 +343,6 @@ export default function DashboardDetailPage() {
               >
                 {dashboardName}
               </h1>
-            )}
-            {isMock && (
-              <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-                mode demo
-              </span>
             )}
           </div>
 
@@ -472,6 +448,7 @@ export default function DashboardDetailPage() {
         isOpen={isPanelOpen}
         onClose={() => setIsPanelOpen(false)}
         onAddWidget={handleAddWidget}
+        workspaceId={dashboardData?.workspace_id}
       />
     </div>
   );

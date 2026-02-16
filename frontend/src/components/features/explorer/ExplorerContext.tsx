@@ -102,6 +102,7 @@ export interface ExplorerState {
   showSqlPreview: boolean;
   generatedSql: string;
   autoExecute: boolean;
+  colorTheme: string;
 }
 
 type ExplorerAction =
@@ -133,6 +134,7 @@ type ExplorerAction =
   | { type: 'ADD_CALCULATED_COLUMN'; column: CalculatedColumn }
   | { type: 'REMOVE_CALCULATED_COLUMN'; columnId: string }
   | { type: 'LOAD_SAVED_SQL'; sql: string; chartType?: ChartType }
+  | { type: 'SET_COLOR_THEME'; theme: string }
   | { type: 'RESET' };
 
 const initialState: ExplorerState = {
@@ -155,6 +157,7 @@ const initialState: ExplorerState = {
   showSqlPreview: false,
   generatedSql: '',
   autoExecute: true,
+  colorTheme: 'classic',
 };
 
 // --- SQL Generation from visual state ---
@@ -445,6 +448,9 @@ function createReducer(relationships: RelationshipDef[]) {
           ...state,
           calculatedColumns: state.calculatedColumns.filter(c => c.id !== action.columnId),
         };
+
+      case 'SET_COLOR_THEME':
+        return { ...state, colorTheme: action.theme };
 
       case 'LOAD_SAVED_SQL':
         return {

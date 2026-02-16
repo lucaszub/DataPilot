@@ -7,28 +7,11 @@ import { Plus, LayoutDashboard, Loader2, AlertCircle, Trash2 } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { api, type DashboardResponse } from '@/lib/api';
-import { mockDashboards, type MockDashboard } from '@/lib/mock-data/dashboards';
-
-/** Adapt mock dashboards to the API shape for the fallback */
-function mockToApiShape(mock: MockDashboard): DashboardResponse {
-  return {
-    id: mock.id,
-    tenant_id: 'mock',
-    workspace_id: 'mock',
-    name: mock.name,
-    description: mock.description,
-    theme: mock.theme,
-    layout_json: null,
-    created_at: mock.createdAt,
-    updated_at: mock.updatedAt,
-  };
-}
 
 export default function DashboardListPage() {
   const router = useRouter();
   const [dashboards, setDashboards] = useState<DashboardResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isMock, setIsMock] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -39,11 +22,9 @@ export default function DashboardListPage() {
     try {
       const data = await api.dashboards.list();
       setDashboards(data);
-      setIsMock(false);
     } catch {
-      // Fallback to mock data
-      setDashboards(mockDashboards.map(mockToApiShape));
-      setIsMock(true);
+      setError('Impossible de charger les tableaux de bord. Vérifiez votre connexion.');
+      setDashboards([]);
     } finally {
       setIsLoading(false);
     }
@@ -54,7 +35,6 @@ export default function DashboardListPage() {
   }, [loadDashboards]);
 
   const handleCreate = async () => {
-    if (isMock) return;
     setIsCreating(true);
     try {
       // Get first workspace
@@ -80,7 +60,6 @@ export default function DashboardListPage() {
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.preventDefault(); // Prevent Link navigation
     e.stopPropagation();
-    if (isMock) return;
     if (!confirm('Supprimer ce tableau de bord ?')) return;
     setDeletingId(id);
     try {
@@ -118,15 +97,12 @@ export default function DashboardListPage() {
           <h1 className="text-2xl font-bold">Tableaux de bord</h1>
           <p className="text-muted-foreground text-sm mt-1">
             Visualisez et analysez vos donnees
-            {isMock && (
-              <span className="ml-2 text-xs text-amber-600">(mode demo -- API indisponible)</span>
-            )}
           </p>
         </div>
         <Button
           className="bg-[#FF5789] hover:bg-[#FF5789]/90"
           onClick={handleCreate}
-          disabled={isCreating || isMock}
+          disabled={isCreating}
         >
           {isCreating ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -136,6 +112,7 @@ export default function DashboardListPage() {
           Nouveau
         </Button>
       </div>
+
 
       {/* Error */}
       {error && (
@@ -157,7 +134,7 @@ export default function DashboardListPage() {
             <Button
               className="bg-[#FF5789] hover:bg-[#FF5789]/90"
               onClick={handleCreate}
-              disabled={isCreating || isMock}
+              disabled={isCreating}
             >
               <Plus className="h-4 w-4 mr-2" />
               Creer un tableau de bord
@@ -173,20 +150,18 @@ export default function DashboardListPage() {
                   <CardTitle className="flex items-center gap-2">
                     <LayoutDashboard className="h-5 w-5 text-[#FF5789]" />
                     <span className="flex-1 truncate">{dashboard.name}</span>
-                    {!isMock && (
-                      <button
-                        onClick={(e) => handleDelete(e, dashboard.id)}
-                        disabled={deletingId === dashboard.id}
-                        className="shrink-0 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                        title="Supprimer"
-                      >
-                        {deletingId === dashboard.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </button>
-                    )}
+                    <button
+                      onClick={(e) => handleDelete(e, dashboard.id)}
+                      disabled={deletingId === dashboard.id}
+                      className="shrink-0 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                      title="Supprimer"
+                    >
+                      {deletingId === dashboard.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </button>
                   </CardTitle>
                   <CardDescription>{dashboard.description}</CardDescription>
                 </CardHeader>

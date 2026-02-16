@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from 'react';
-import { BarChart3, LineChart, PieChart, Table, FileText, Activity } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { BarChart3, LineChart, PieChart, Table, FileText, Activity, Loader2 } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -14,13 +14,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { savedQueries, type SavedQuery } from '@/lib/mock-data/saved-queries';
+import { api, type SavedQueryResponse } from '@/lib/api';
 import type { DashboardWidget } from '@/lib/mock-data/dashboards';
 
 interface WidgetCreationPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onAddWidget: (widget: Partial<DashboardWidget>) => void;
+  workspaceId?: string;
 }
 
 type WidgetType = 'kpi' | 'chart' | 'table' | 'text';
@@ -30,12 +31,25 @@ export function WidgetCreationPanel({
   isOpen,
   onClose,
   onAddWidget,
+  workspaceId,
 }: WidgetCreationPanelProps) {
   const [step, setStep] = useState(1);
   const [widgetType, setWidgetType] = useState<WidgetType | null>(null);
-  const [selectedQuery, setSelectedQuery] = useState<SavedQuery | null>(null);
+  const [selectedQuery, setSelectedQuery] = useState<SavedQueryResponse | null>(null);
   const [chartType, setChartType] = useState<ChartType | null>(null);
   const [title, setTitle] = useState('');
+  const [queries, setQueries] = useState<SavedQueryResponse[]>([]);
+  const [isLoadingQueries, setIsLoadingQueries] = useState(false);
+
+  // Load saved queries from API when the panel opens
+  useEffect(() => {
+    if (!isOpen || !workspaceId) return;
+    setIsLoadingQueries(true);
+    api.queries.listSaved(workspaceId)
+      .then(setQueries)
+      .catch(() => setQueries([]))
+      .finally(() => setIsLoadingQueries(false));
+  }, [isOpen, workspaceId]);
 
   const handleReset = () => {
     setStep(1);
@@ -62,7 +76,7 @@ export function WidgetCreationPanel({
     }
   };
 
-  const handleQuerySelect = (query: SavedQuery) => {
+  const handleQuerySelect = (query: SavedQueryResponse) => {
     setSelectedQuery(query);
     setTitle(query.name);
 
@@ -126,8 +140,8 @@ export function WidgetCreationPanel({
 
   // Filter queries based on widget type
   const availableQueries = widgetType === 'table'
-    ? savedQueries.filter(q => q.chartType === 'table' || q.results?.length > 0)
-    : savedQueries.filter(q => q.chartType !== 'kpi');
+    ? queries.filter(q => q.chart_type === 'table' || !q.chart_type)
+    : queries.filter(q => q.chart_type !== 'kpi');
 
   return (
     <Sheet open={isOpen} onOpenChange={handleClose}>
@@ -168,22 +182,34 @@ export function WidgetCreationPanel({
           {/* Step 2: Query Selection */}
           {step === 2 && (
             <div className="space-y-3 max-h-[400px] overflow-y-auto">
-              {availableQueries.map((query) => (
-                <button
-                  key={query.id}
-                  onClick={() => handleQuerySelect(query)}
-                  className={cn(
-                    "w-full text-left p-4 rounded-lg border-2 transition-all hover:border-[#FF5789] hover:bg-[#FF5789]/5",
-                    selectedQuery?.id === query.id ? "border-[#FF5789] bg-[#FF5789]/5" : "border-border"
-                  )}
-                >
-                  <div className="font-medium text-sm">{query.name}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{query.description}</div>
-                  <div className="text-xs text-muted-foreground mt-2">
-                    {query.results?.length || 0} lignes
-                  </div>
-                </button>
-              ))}
+              {isLoadingQueries ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : availableQueries.length === 0 ? (
+                <div className="text-center py-8 text-sm text-muted-foreground">
+                  Aucune requete enregistree disponible.
+                </div>
+              ) : (
+                availableQueries.map((query) => (
+                  <button
+                    key={query.id}
+                    onClick={() => handleQuerySelect(query)}
+                    className={cn(
+                      "w-full text-left p-4 rounded-lg border-2 transition-all hover:border-[#FF5789] hover:bg-[#FF5789]/5",
+                      selectedQuery?.id === query.id ? "border-[#FF5789] bg-[#FF5789]/5" : "border-border"
+                    )}
+                  >
+                    <div className="font-medium text-sm">{query.name}</div>
+                    {query.chart_type && (
+                      <div className="text-xs text-muted-foreground mt-1">Type : {query.chart_type}</div>
+                    )}
+                    <div className="text-xs text-muted-foreground mt-1 font-mono truncate">
+                      {query.sql_text}
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
           )}
 

@@ -15,13 +15,13 @@ interface ThemeSelectorProps {
   onThemeChange: (theme: string) => void;
 }
 
-interface ColorPalette {
+export interface ColorPalette {
   name: string;
   id: string;
   colors: string[];
 }
 
-const COLOR_PALETTES: ColorPalette[] = [
+export const COLOR_PALETTES: ColorPalette[] = [
   {
     name: 'Classique',
     id: 'classic',
