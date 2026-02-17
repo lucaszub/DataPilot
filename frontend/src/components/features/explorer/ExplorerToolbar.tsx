@@ -1,9 +1,10 @@
 "use client";
 
-import React from 'react';
-import { Table, Sheet, BarChart3, Grid3x3, Download, Sparkles, Clock, Loader2, Terminal, Filter, RotateCcw } from 'lucide-react';
+import React, { useState } from 'react';
+import { Table, Sheet, BarChart3, Grid3x3, Download, Sparkles, Clock, Loader2, Terminal, Filter, RotateCcw, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useExplorer, ViewMode, ChartType } from './ExplorerContext';
+import { SaveChartDialog } from './SaveChartDialog';
 
 const viewModeIcons: Record<ViewMode, React.ReactNode> = {
   table: <Table className="h-4 w-4" />,
@@ -40,7 +41,8 @@ const chartTypeIcons: Record<ChartType, React.ReactNode> = {
 };
 
 export function ExplorerToolbar() {
-  const { state, dispatch } = useExplorer();
+  const { state, dispatch, workspaceId } = useExplorer();
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
 
   const setViewMode = (mode: ViewMode) => {
     dispatch({ type: 'SET_VIEW_MODE', mode });
@@ -204,6 +206,22 @@ export function ExplorerToolbar() {
           <Clock className="h-4 w-4" />
         </button>
 
+        {/* Save chart */}
+        <button
+          onClick={() => setShowSaveDialog(true)}
+          disabled={!state.result || !state.generatedSql}
+          className={cn(
+            "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+            state.result && state.generatedSql
+              ? "bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20"
+              : "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+          )}
+          title="Enregistrer le graphique"
+        >
+          <Save className="h-4 w-4" />
+          <span>Enregistrer</span>
+        </button>
+
         {/* Export */}
         <button
           disabled={!state.result}
@@ -226,6 +244,13 @@ export function ExplorerToolbar() {
           <RotateCcw className="h-4 w-4" />
         </button>
       </div>
+
+      {/* Save chart dialog */}
+      <SaveChartDialog
+        open={showSaveDialog}
+        onClose={() => setShowSaveDialog(false)}
+        workspaceId={workspaceId}
+      />
     </div>
   );
 }

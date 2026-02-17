@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Database,
-  GitMerge,
   Code,
   LayoutDashboard,
   Settings,
@@ -35,8 +34,7 @@ import { useAuth } from "@/contexts/AuthContext";
 // --- Nav items ---
 
 const navItems = [
-  { label: "Sources", icon: Database, href: "/sources" },
-  { label: "Modele", icon: GitMerge, href: "/model" },
+  { label: "Donnees", icon: Database, href: "/sources" },
   { label: "Explorer", icon: Code, href: "/explorer" },
   { label: "Tableaux de bord", icon: LayoutDashboard, href: "/dashboard" },
   { label: "Chat IA", icon: MessageCircle, href: "/chat" },
@@ -58,9 +56,9 @@ function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar-background">
       {/* Logo */}
-      <SidebarHeader className="px-4 py-4 border-b border-sidebar-border">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+      <SidebarHeader className="px-4 py-4 border-b border-sidebar-border overflow-hidden">
+        <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary">
             <svg
               className="h-5 w-5 text-primary-foreground"
               fill="none"
@@ -76,7 +74,7 @@ function AppSidebar() {
               />
             </svg>
           </div>
-          <span className="text-base font-bold text-sidebar-foreground tracking-tight">
+          <span className="text-base font-bold text-sidebar-foreground tracking-tight group-data-[collapsible=icon]:hidden">
             DataPilot
           </span>
         </div>
@@ -115,15 +113,15 @@ function AppSidebar() {
       </SidebarContent>
 
       {/* Footer: user info + theme toggle + logout */}
-      <SidebarFooter className="border-t border-sidebar-border px-4 py-3 space-y-2">
-        <div className="flex items-center justify-between gap-2">
+      <SidebarFooter className="border-t border-sidebar-border px-4 py-3 space-y-2 overflow-hidden">
+        <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
           <p
-            className="truncate text-xs text-muted-foreground"
+            className="truncate text-xs text-muted-foreground group-data-[collapsible=icon]:hidden"
             title={user?.email ?? ""}
           >
             {user?.email ?? ""}
           </p>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 group-data-[collapsible=icon]:hidden">
             <ThemeToggle />
             <Button
               variant="ghost"
